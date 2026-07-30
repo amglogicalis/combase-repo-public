@@ -71,6 +71,9 @@
                         <button class="btn btn-secondary btn-sm" id="btn-open-new-db" title="Create new database">
                             <i class="fa-solid fa-plus"></i> New DB
                         </button>
+                        <button class="btn btn-secondary btn-sm" id="btn-open-rename-db" title="Rename active database">
+                            <i class="fa-solid fa-pen"></i>
+                        </button>
                         <button class="btn btn-danger-outline btn-sm" id="btn-delete-active-db" title="Delete active database">
                             <i class="fa-solid fa-trash-can"></i>
                         </button>
@@ -86,6 +89,9 @@
                         </select>
                         <button class="btn btn-secondary btn-sm" id="btn-open-new-branch" title="Create database branch">
                             <i class="fa-solid fa-plus"></i> New Branch
+                        </button>
+                        <button class="btn btn-secondary btn-sm" id="btn-open-rename-branch" title="Rename active branch">
+                            <i class="fa-solid fa-pen"></i>
                         </button>
                         <button class="btn btn-danger-outline btn-sm" id="btn-delete-active-branch" title="Delete active branch">
                             <i class="fa-solid fa-trash-can"></i>
@@ -329,6 +335,30 @@
         </div>
     </div>
 
+    <!-- MODAL: Rename Database -->
+    <div id="modal-rename-db" class="modal-backdrop hidden">
+        <div class="modal-card glass" style="width: 440px;">
+            <div class="modal-header">
+                <h3><i class="fa-solid fa-pen text-teal mr-2"></i> Rename Database</h3>
+                <button class="btn-close">&times;</button>
+            </div>
+            <div class="modal-body p-4 flex flex-column gap-3">
+                <div>
+                    <label class="label-text">Current Database Name:</label>
+                    <span id="rename-db-old-name" class="font-bold text-teal block mt-1"></span>
+                </div>
+                <div>
+                    <label class="label-text">New Database Name:</label>
+                    <input type="text" id="input-rename-db-new" class="input-text w-full mt-1" placeholder="e.g. production_db" />
+                </div>
+            </div>
+            <div class="modal-footer p-4 flex justify-end gap-2">
+                <button class="btn btn-secondary btn-cancel">Cancel</button>
+                <button class="btn btn-primary" id="btn-confirm-rename-db">Rename Database</button>
+            </div>
+        </div>
+    </div>
+
     <!-- MODAL: New Branch -->
     <div id="modal-new-branch" class="modal-backdrop hidden">
         <div class="modal-card glass">
@@ -343,6 +373,30 @@
             <div class="modal-footer p-4 flex justify-end gap-2">
                 <button class="btn btn-secondary btn-cancel">Cancel</button>
                 <button class="btn btn-primary" id="btn-confirm-new-branch">Create Branch</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL: Rename Branch -->
+    <div id="modal-rename-branch" class="modal-backdrop hidden">
+        <div class="modal-card glass" style="width: 440px;">
+            <div class="modal-header">
+                <h3><i class="fa-solid fa-pen text-teal mr-2"></i> Rename Branch</h3>
+                <button class="btn-close">&times;</button>
+            </div>
+            <div class="modal-body p-4 flex flex-column gap-3">
+                <div>
+                    <label class="label-text">Current Branch Name:</label>
+                    <span id="rename-branch-old-name" class="font-bold text-teal block mt-1"></span>
+                </div>
+                <div>
+                    <label class="label-text">New Branch Name:</label>
+                    <input type="text" id="input-rename-branch-new" class="input-text w-full mt-1" placeholder="e.g. dev, staging" />
+                </div>
+            </div>
+            <div class="modal-footer p-4 flex justify-end gap-2">
+                <button class="btn btn-secondary btn-cancel">Cancel</button>
+                <button class="btn btn-primary" id="btn-confirm-rename-branch">Rename Branch</button>
             </div>
         </div>
     </div>

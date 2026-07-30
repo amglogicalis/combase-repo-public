@@ -11,79 +11,13 @@ class CombaseStudioApp {
     // Dynamic Time-Travel Commit Checkpoints History
     this.commitHistory = [];
 
-    // Initial Demo Database Template
-    this.defaultDatabases = {
+    // Strictly Clean Empty Database State (NO Demo Rows)
+    this.databases = {
       default_db: {
-        schemas: {
-          users: {
-            name: 'users',
-            columns: [
-              { name: 'id', type: 'INTEGER', primaryKey: true },
-              { name: 'name', type: 'TEXT' },
-              { name: 'email', type: 'TEXT' },
-              { name: 'role', type: 'TEXT' }
-            ],
-            createdAt: new Date().toISOString(),
-            updatedAt: new Date().toISOString()
-          },
-          products: {
-            name: 'products',
-            columns: [
-              { name: 'id', type: 'INTEGER', primaryKey: true },
-              { name: 'title', type: 'TEXT' },
-              { name: 'price', type: 'REAL' },
-              { name: 'category', type: 'TEXT' }
-            ],
-            createdAt: new Date().toISOString(),
-            updatedAt: new Date().toISOString()
-          },
-          orders: {
-            name: 'orders',
-            columns: [
-              { name: 'order_id', type: 'INTEGER', primaryKey: true },
-              { name: 'user_id', type: 'INTEGER' },
-              { name: 'total_amount', type: 'REAL' },
-              { name: 'status', type: 'TEXT' }
-            ],
-            createdAt: new Date().toISOString(),
-            updatedAt: new Date().toISOString()
-          },
-          system_logs: {
-            name: 'system_logs',
-            columns: [
-              { name: 'id', type: 'INTEGER', primaryKey: true },
-              { name: 'event', type: 'TEXT' },
-              { name: 'level', type: 'TEXT' },
-              { name: 'timestamp', type: 'DATETIME' }
-            ],
-            createdAt: new Date().toISOString(),
-            updatedAt: new Date().toISOString()
-          }
-        },
-        tables: {
-          users: [
-            { id: 1, name: 'Adrián', email: 'adrian@terra.org', role: 'Admin' },
-            { id: 2, name: 'Combase Bot', email: 'bot@terra.org', role: 'System Engine' },
-            { id: 3, name: 'Elena García', email: 'elena@terra.org', role: 'Developer' }
-          ],
-          products: [
-            { id: 101, title: 'Terra AI Serverless Runner', price: 0.00, category: 'Compute' },
-            { id: 102, title: 'Rolla Storage Vault 1TB', price: 0.00, category: 'Storage' },
-            { id: 103, title: 'Webbl CDN Global Edge', price: 0.00, category: 'Hosting' }
-          ],
-          orders: [
-            { order_id: 5001, user_id: 1, total_amount: 0.00, status: 'COMPLETED' },
-            { order_id: 5002, user_id: 3, total_amount: 0.00, status: 'PROCESSING' }
-          ],
-          system_logs: [
-            { id: 1, event: 'COMBASE Initialized', level: 'INFO', timestamp: new Date().toISOString() },
-            { id: 2, event: 'Zero-Copy Checkpoint Created', level: 'INFO', timestamp: new Date().toISOString() }
-          ]
-        }
+        schemas: {},
+        tables: {}
       }
     };
-
-    this.databases = JSON.parse(JSON.stringify(this.defaultDatabases));
 
     this.initElements();
     this.attachEventListeners();
@@ -108,8 +42,8 @@ class CombaseStudioApp {
     this.vaultFileSha = null;
     localStorage.removeItem('combase_gh_token');
 
-    // Reset Databases
-    this.databases = JSON.parse(JSON.stringify(this.defaultDatabases));
+    // Reset memory
+    this.databases = { default_db: { schemas: {}, tables: {} } };
     this.commitHistory = [];
 
     document.getElementById('view-auth-required').classList.remove('hidden');
@@ -120,7 +54,7 @@ class CombaseStudioApp {
     this.navItems.forEach(item => item.classList.add('disabled'));
 
     this.userProfile.innerHTML = `
-      <div class="avatar-placeholder"><i class="fa-regular fa-user"></i></div>
+      <div class="avatar-placeholder"><i class="fa-solid fa-lock text-danger"></i></div>
       <div class="user-info">
         <span class="user-name">Guest Mode</span>
         <span class="user-status text-danger"><i class="fa-solid fa-circle" style="font-size:8px;"></i> Disconnected</span>
@@ -232,10 +166,6 @@ class CombaseStudioApp {
           },
           body: JSON.stringify({ name: repo, private: true, auto_init: true })
         });
-
-        // Initialize with default demo tables
-        this.databases = JSON.parse(JSON.stringify(this.defaultDatabases));
-        await this.pushToGitHubVault('Initialize COMBASE storage vault');
         this.showToast('Storage Initialized', 'Created private .combase-storage repo', 'info');
         return;
       }
@@ -254,10 +184,6 @@ class CombaseStudioApp {
         this.databases = remoteData;
         this.updateDbState();
         this.showToast('Vault Loaded', 'Database loaded from GitHub .combase-storage!', 'success');
-      } else {
-        // If file doesn't exist yet, push default tables
-        this.databases = JSON.parse(JSON.stringify(this.defaultDatabases));
-        await this.pushToGitHubVault('Initialize default database schema');
       }
 
       // 3. Fetch Commit History
@@ -294,17 +220,25 @@ class CombaseStudioApp {
 
     this.dbSelect = document.getElementById('db-select');
     this.btnOpenNewDb = document.getElementById('btn-open-new-db');
+    this.btnOpenRenameDb = document.getElementById('btn-open-rename-db');
     this.btnDeleteActiveDb = document.getElementById('btn-delete-active-db');
     this.modalNewDb = document.getElementById('modal-new-db');
     this.btnConfirmNewDb = document.getElementById('btn-confirm-new-db');
     this.inputNewDbName = document.getElementById('input-new-db-name');
 
+    this.modalRenameDb = document.getElementById('modal-rename-db');
+    this.btnConfirmRenameDb = document.getElementById('btn-confirm-rename-db');
+
     this.branchSelect = document.getElementById('branch-select');
     this.btnOpenNewBranch = document.getElementById('btn-open-new-branch');
+    this.btnOpenRenameBranch = document.getElementById('btn-open-rename-branch');
     this.btnDeleteActiveBranch = document.getElementById('btn-delete-active-branch');
     this.modalNewBranch = document.getElementById('modal-new-branch');
     this.btnConfirmNewBranch = document.getElementById('btn-confirm-new-branch');
     this.inputNewBranchName = document.getElementById('input-new-branch-name');
+
+    this.modalRenameBranch = document.getElementById('modal-rename-branch');
+    this.btnConfirmRenameBranch = document.getElementById('btn-confirm-rename-branch');
 
     this.statActiveDb = document.getElementById('stat-active-db');
     this.statTables = document.getElementById('stat-tables');
@@ -401,42 +335,76 @@ class CombaseStudioApp {
       if (dbName) {
         if (!this.databases[dbName]) {
           this.databases[dbName] = { schemas: {}, tables: {} };
-          const opt = document.createElement('option');
-          opt.value = dbName;
-          opt.textContent = dbName;
-          this.dbSelect.appendChild(opt);
         }
-        this.dbSelect.value = dbName;
         this.activeDb = dbName;
         this.inputNewDbName.value = '';
         this.modalNewDb.classList.add('hidden');
+        this.renderDbDropdown();
         this.persistCurrentState(`Created Database '${dbName}'`);
         this.updateDbState();
         this.showToast('Success', `Database '${dbName}' created`, 'success');
       }
     });
 
+    // Rename Active DB
+    if (this.btnOpenRenameDb) {
+      this.btnOpenRenameDb.addEventListener('click', () => {
+        document.getElementById('rename-db-old-name').textContent = this.activeDb;
+        document.getElementById('input-rename-db-new').value = this.activeDb;
+        this.modalRenameDb.classList.remove('hidden');
+      });
+    }
+
+    if (this.btnConfirmRenameDb) {
+      this.btnConfirmRenameDb.addEventListener('click', () => {
+        const newDbName = document.getElementById('input-rename-db-new').value.trim();
+        const oldDbName = this.activeDb;
+        if (newDbName && newDbName !== oldDbName) {
+          this.databases[newDbName] = this.databases[oldDbName];
+          delete this.databases[oldDbName];
+          this.activeDb = newDbName;
+          this.modalRenameDb.classList.add('hidden');
+          this.renderDbDropdown();
+          this.persistCurrentState(`Renamed Database '${oldDbName}' -> '${newDbName}'`);
+          this.updateDbState();
+          this.showToast('Database Renamed', `Renamed '${oldDbName}' to '${newDbName}'`, 'success');
+        }
+      });
+    }
+
     // Delete Active DB
     if (this.btnDeleteActiveDb) {
-      this.btnDeleteActiveDb.addEventListener('click', () => {
-        if (this.activeDb === 'default_db' && Object.keys(this.databases).length === 1) {
-          this.showToast('Error', 'Cannot delete default_db when it is the only database.', 'error');
+      this.btnDeleteActiveDb.addEventListener('click', (e) => {
+        e.preventDefault();
+        const currentDb = this.activeDb;
+        if (currentDb === 'default_db' && Object.keys(this.databases).length === 1) {
+          this.showConfirmModal(
+            'Clear Default Database Warning',
+            `Are you sure you want to clear all tables and schemas in 'default_db'?`,
+            () => {
+              this.databases['default_db'] = { schemas: {}, tables: {} };
+              this.persistCurrentState(`Cleared database 'default_db'`);
+              this.updateDbState();
+              this.showToast('Database Cleared', `Cleared all tables in default_db`, 'success');
+            }
+          );
           return;
         }
+
         this.showConfirmModal(
           'Delete Database Warning',
-          `Are you sure you want to delete database '${this.activeDb}' and all its tables?`,
+          `Are you sure you want to delete database '${currentDb}' and all its tables?`,
           () => {
-            delete this.databases[this.activeDb];
+            delete this.databases[currentDb];
             const remainingDbs = Object.keys(this.databases);
             this.activeDb = remainingDbs[0] || 'default_db';
             if (!this.databases[this.activeDb]) {
               this.databases[this.activeDb] = { schemas: {}, tables: {} };
             }
             this.renderDbDropdown();
-            this.persistCurrentState(`Deleted Database '${this.activeDb}'`);
+            this.persistCurrentState(`Deleted Database '${currentDb}'`);
             this.updateDbState();
-            this.showToast('Deleted', `Database deleted. Active DB: ${this.activeDb}`, 'success');
+            this.showToast('Database Deleted', `Deleted '${currentDb}'. Active DB: ${this.activeDb}`, 'success');
           }
         );
       });
@@ -460,23 +428,51 @@ class CombaseStudioApp {
       }
     });
 
+    // Rename Active Branch
+    if (this.btnOpenRenameBranch) {
+      this.btnOpenRenameBranch.addEventListener('click', () => {
+        document.getElementById('rename-branch-old-name').textContent = this.activeBranch;
+        document.getElementById('input-rename-branch-new').value = this.activeBranch;
+        this.modalRenameBranch.classList.remove('hidden');
+      });
+    }
+
+    if (this.btnConfirmRenameBranch) {
+      this.btnConfirmRenameBranch.addEventListener('click', () => {
+        const newBranchName = document.getElementById('input-rename-branch-new').value.trim();
+        const oldBranchName = this.activeBranch;
+        if (newBranchName && newBranchName !== oldBranchName) {
+          const opt = this.branchSelect.querySelector(`option[value="${oldBranchName}"]`);
+          if (opt) {
+            opt.value = newBranchName;
+            opt.textContent = newBranchName;
+          }
+          this.activeBranch = newBranchName;
+          this.modalRenameBranch.classList.add('hidden');
+          this.persistCurrentState(`Renamed Branch '${oldBranchName}' -> '${newBranchName}'`);
+          this.showToast('Branch Renamed', `Renamed branch to '${newBranchName}'`, 'success');
+        }
+      });
+    }
+
     // Delete Active Branch
     if (this.btnDeleteActiveBranch) {
-      this.btnDeleteActiveBranch.addEventListener('click', () => {
-        if (this.activeBranch === 'main') {
+      this.btnDeleteActiveBranch.addEventListener('click', (e) => {
+        e.preventDefault();
+        const currentBranch = this.activeBranch;
+        if (currentBranch === 'main') {
           this.showToast('Error', 'Cannot delete main branch.', 'error');
           return;
         }
         this.showConfirmModal(
           'Delete Branch Warning',
-          `Are you sure you want to delete database branch '${this.activeBranch}'?`,
+          `Are you sure you want to delete database branch '${currentBranch}'?`,
           () => {
-            const deleted = this.activeBranch;
-            const opt = this.branchSelect.querySelector(`option[value="${deleted}"]`);
+            const opt = this.branchSelect.querySelector(`option[value="${currentBranch}"]`);
             if (opt) opt.remove();
             this.activeBranch = 'main';
             this.branchSelect.value = 'main';
-            this.showToast('Branch Deleted', `Deleted branch '${deleted}'. Switched to main.`, 'success');
+            this.showToast('Branch Deleted', `Deleted branch '${currentBranch}'. Switched to main.`, 'success');
           }
         );
       });
