@@ -5,7 +5,7 @@ class CombaseStudioApp {
     this.activeBranch = 'main';
     this.user = null;
 
-    // Multi-Database State Store
+    // Multi-Database State Store (Pre-populated demo tables)
     this.databases = {
       default_db: {
         schemas: {
@@ -30,16 +30,48 @@ class CombaseStudioApp {
             ],
             createdAt: new Date().toISOString(),
             updatedAt: new Date().toISOString()
+          },
+          orders: {
+            name: 'orders',
+            columns: [
+              { name: 'order_id', type: 'INTEGER', primaryKey: true },
+              { name: 'user_id', type: 'INTEGER' },
+              { name: 'total_amount', type: 'REAL' },
+              { name: 'status', type: 'TEXT' }
+            ],
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString()
+          },
+          system_logs: {
+            name: 'system_logs',
+            columns: [
+              { name: 'id', type: 'INTEGER', primaryKey: true },
+              { name: 'event', type: 'TEXT' },
+              { name: 'level', type: 'TEXT' },
+              { name: 'timestamp', type: 'DATETIME' }
+            ],
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString()
           }
         },
         tables: {
           users: [
             { id: 1, name: 'Adrián', email: 'adrian@terra.org', role: 'Admin' },
-            { id: 2, name: 'Combase Bot', email: 'bot@terra.org', role: 'System Engine' }
+            { id: 2, name: 'Combase Bot', email: 'bot@terra.org', role: 'System Engine' },
+            { id: 3, name: 'Elena García', email: 'elena@terra.org', role: 'Developer' }
           ],
           products: [
             { id: 101, title: 'Terra AI Serverless Runner', price: 0.00, category: 'Compute' },
-            { id: 102, title: 'Rolla Storage Vault 1TB', price: 0.00, category: 'Storage' }
+            { id: 102, title: 'Rolla Storage Vault 1TB', price: 0.00, category: 'Storage' },
+            { id: 103, title: 'Webbl CDN Global Edge', price: 0.00, category: 'Hosting' }
+          ],
+          orders: [
+            { order_id: 5001, user_id: 1, total_amount: 0.00, status: 'COMPLETED' },
+            { order_id: 5002, user_id: 3, total_amount: 0.00, status: 'PROCESSING' }
+          ],
+          system_logs: [
+            { id: 1, event: 'COMBASE Initialized', level: 'INFO', timestamp: new Date().toISOString() },
+            { id: 2, event: 'Zero-Copy Checkpoint Created', level: 'INFO', timestamp: new Date().toISOString() }
           ]
         }
       }
@@ -85,7 +117,6 @@ class CombaseStudioApp {
 
     this.schemaTreeList = document.getElementById('schema-tree-list');
     this.sqlEditor = document.getElementById('sql-editor');
-    this.snippetDropdown = document.getElementById('snippet-dropdown');
     this.btnSqlRun = document.getElementById('btn-sql-run');
     this.btnSqlClear = document.getElementById('btn-sql-clear');
     this.queryResultsContainer = document.getElementById('query-results-container');
@@ -167,20 +198,6 @@ class CombaseStudioApp {
         this.inputNewBranchName.value = '';
         this.modalNewBranch.classList.add('hidden');
         this.showToast('Branch Created', `Branch '${branchName}' active`, 'success');
-      }
-    });
-
-    // SQL Snippets Dropdown
-    this.snippetDropdown.addEventListener('change', (e) => {
-      const val = e.target.value;
-      if (val === 'create_users') {
-        this.sqlEditor.value = `CREATE TABLE users (id INTEGER PRIMARY KEY, name TEXT, email TEXT, role TEXT);`;
-      } else if (val === 'insert_user') {
-        this.sqlEditor.value = `INSERT INTO users (name, email, role) VALUES ('Carlos', 'carlos@terra.org', 'Developer');`;
-      } else if (val === 'select_all') {
-        this.sqlEditor.value = `SELECT * FROM users;`;
-      } else if (val === 'select_where') {
-        this.sqlEditor.value = `SELECT * FROM users WHERE role = 'Admin';`;
       }
     });
 
@@ -284,14 +301,20 @@ class CombaseStudioApp {
         headers: { 'Authorization': `token ${this.token}` }
       });
 
-      if (!res.ok) throw new Error('Invalid Token');
+      if (!res.ok) {
+        if (res.status === 401) {
+          throw new Error('Invalid Token');
+        }
+      }
 
       this.user = await res.json();
       this.setAuthenticatedState();
-      this.showToast('Connected', `Connected as ${this.user.login}`, 'success');
 
     } catch (err) {
-      this.disconnect();
+      if (err.message === 'Invalid Token') {
+        this.disconnect();
+        this.showToast('Error', 'Invalid or expired GitHub PAT.', 'error');
+      }
     } finally {
       this.btnConnect.innerHTML = 'Connect';
     }
@@ -329,6 +352,7 @@ class CombaseStudioApp {
   setAuthenticatedState() {
     document.getElementById('token-group').classList.add('hidden');
     this.btnDisconnect.classList.remove('hidden');
+    if (this.tokenInput) this.tokenInput.value = this.token;
     
     this.userProfile.innerHTML = `
       <img src="${this.user.avatar_url}" class="avatar-placeholder" alt="${this.user.login}">

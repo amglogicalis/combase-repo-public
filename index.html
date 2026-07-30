@@ -96,8 +96,8 @@
                 </div>
             </header>
 
-            <!-- Stats Bar -->
-            <section class="stats-grid">
+            <!-- Stats Bar (3 Spacious Cards) -->
+            <section class="stats-grid grid-3Col gap-4">
                 <div class="stat-card glass">
                     <div class="stat-icon"><i class="fa-solid fa-database"></i></div>
                     <div class="stat-details">
@@ -119,20 +119,13 @@
                         <h3 class="stat-value" id="stat-records">0</h3>
                     </div>
                 </div>
-                <div class="stat-card glass">
-                    <div class="stat-icon"><i class="fa-solid fa-shield-halved"></i></div>
-                    <div class="stat-details">
-                        <span class="stat-label">Infrastructure</span>
-                        <h3 class="stat-value text-accent">$0 / Month</h3>
-                    </div>
-                </div>
             </section>
 
             <!-- VIEW 1: SQL Studio -->
             <div class="view-content" id="view-studio">
                 <div class="studio-layout grid-studio gap-4">
                     <!-- Left Schema Tree -->
-                    <div class="schema-sidebar glass p-3 flex flex-column">
+                    <div class="schema-sidebar glass p-4 flex flex-column">
                         <div class="panel-header flex align-center justify-between mb-3">
                             <span class="panel-title"><i class="fa-solid fa-folder-tree text-teal mr-2"></i> Schema Navigator</span>
                             <button class="btn btn-secondary btn-xs" id="btn-refresh-schemas" title="Refresh Schema Tree"><i class="fa-solid fa-rotate-right"></i></button>
@@ -148,13 +141,6 @@
                             <div class="panel-header flex align-center justify-between mb-3">
                                 <span class="panel-title"><i class="fa-solid fa-terminal text-teal mr-2"></i> SQL Query Editor</span>
                                 <div class="flex gap-2">
-                                    <select id="snippet-dropdown" class="select-input select-sm">
-                                        <option value="">-- SQL Snippets & Templates --</option>
-                                        <option value="create_users">CREATE TABLE users</option>
-                                        <option value="insert_user">INSERT INTO users</option>
-                                        <option value="select_all">SELECT * FROM users</option>
-                                        <option value="select_where">SELECT with WHERE filter</option>
-                                    </select>
                                     <button class="btn btn-secondary btn-sm" id="btn-sql-clear"><i class="fa-solid fa-eraser"></i> Clear</button>
                                     <button class="btn btn-primary btn-sm" id="btn-sql-run"><i class="fa-solid fa-play"></i> Run Query (Ctrl+Enter)</button>
                                 </div>
@@ -210,44 +196,52 @@
             <!-- VIEW 4: Provider Bridge -->
             <div class="view-content hidden" id="view-bridge">
                 <div class="bridge-layout glass p-5 flex flex-column gap-4">
-                    <h2><i class="fa-solid fa-network-wired text-teal mr-2"></i> Multi-Cloud Provider Bridge</h2>
-                    <p class="text-muted">COMBASE is 100% independent at $0 cost on GitHub Engine. Generate real DDL migration scripts and payloads to replicate your schema to external providers.</p>
+                    <div class="bridge-header mb-2">
+                        <h2><i class="fa-solid fa-network-wired text-teal mr-2"></i> Multi-Cloud Provider Bridge</h2>
+                        <p class="text-muted mt-1" style="font-size: 14px; line-height: 1.6;">COMBASE is 100% independent at $0 cost on GitHub Engine. Generate real DDL migration scripts and payloads to replicate your schema to external providers.</p>
+                    </div>
                     
-                    <div class="grid-3Col gap-4 mt-3">
-                        <div class="bridge-card glass p-4 flex flex-column gap-3">
-                            <div class="flex align-center gap-3">
+                    <div class="grid-3Col gap-4 mt-2">
+                        <div class="bridge-card glass flex flex-column">
+                            <div class="flex align-center gap-3 mb-3">
                                 <div class="provider-icon-badge"><i class="fa-solid fa-database text-teal"></i></div>
                                 <div>
-                                    <h4>PostgreSQL / Supabase</h4>
+                                    <h4 class="bridge-card-title">PostgreSQL / Supabase</h4>
                                     <span class="text-small text-muted">Relational DDL & Copy Script</span>
                                 </div>
                             </div>
-                            <p class="text-small text-muted flex-1">Generates standard PostgreSQL DDL schemas and INSERT statements for migration to Supabase or AWS RDS.</p>
-                            <button class="btn btn-secondary btn-sm w-full btn-bridge-generate" data-provider="postgres"><i class="fa-solid fa-code"></i> Generate Postgres DDL</button>
+                            <p class="bridge-card-desc flex-1">Generates standard PostgreSQL DDL schemas and INSERT statements for seamless migration to Supabase or AWS RDS.</p>
+                            <div class="mt-4">
+                                <button class="btn btn-secondary btn-sm w-full btn-bridge-generate" data-provider="postgres"><i class="fa-solid fa-code"></i> Generate Postgres DDL</button>
+                            </div>
                         </div>
 
-                        <div class="bridge-card glass p-4 flex flex-column gap-3">
-                            <div class="flex align-center gap-3">
+                        <div class="bridge-card glass flex flex-column">
+                            <div class="flex align-center gap-3 mb-3">
                                 <div class="provider-icon-badge"><i class="fa-brands fa-aws text-teal"></i></div>
                                 <div>
-                                    <h4>AWS DynamoDB</h4>
+                                    <h4 class="bridge-card-title">AWS DynamoDB</h4>
                                     <span class="text-small text-muted">NoSQL Document Payload</span>
                                 </div>
                             </div>
-                            <p class="text-small text-muted flex-1">Converts table schemas and rows into DynamoDB JSON item collections for batch ingestion.</p>
-                            <button class="btn btn-secondary btn-sm w-full btn-bridge-generate" data-provider="dynamodb"><i class="fa-solid fa-file-code"></i> Generate DynamoDB JSON</button>
+                            <p class="bridge-card-desc flex-1">Converts table schemas and rows into DynamoDB JSON item collections for batch ingestion.</p>
+                            <div class="mt-4">
+                                <button class="btn btn-secondary btn-sm w-full btn-bridge-generate" data-provider="dynamodb"><i class="fa-solid fa-file-code"></i> Generate DynamoDB JSON</button>
+                            </div>
                         </div>
 
-                        <div class="bridge-card glass p-4 flex flex-column gap-3">
-                            <div class="flex align-center gap-3">
+                        <div class="bridge-card glass flex flex-column">
+                            <div class="flex align-center gap-3 mb-3">
                                 <div class="provider-icon-badge"><i class="fa-solid fa-cube text-teal"></i></div>
                                 <div>
-                                    <h4>Rolla Bucket & S3</h4>
+                                    <h4 class="bridge-card-title">Rolla Bucket & S3</h4>
                                     <span class="text-small text-muted">Binary Parquet Checkpoints</span>
                                 </div>
                             </div>
-                            <p class="text-small text-muted flex-1">Archives state snapshots into immutable Rolla-Balls (`.rolla-storage`) or S3 object stores.</p>
-                            <button class="btn btn-secondary btn-sm w-full btn-bridge-generate" data-provider="rolla"><i class="fa-solid fa-box-archive"></i> Archive to Rolla/S3</button>
+                            <p class="bridge-card-desc flex-1">Archives state snapshots into immutable Rolla-Balls (`.rolla-storage`) or S3 object stores.</p>
+                            <div class="mt-4">
+                                <button class="btn btn-secondary btn-sm w-full btn-bridge-generate" data-provider="rolla"><i class="fa-solid fa-box-archive"></i> Archive to Rolla/S3</button>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -266,7 +260,7 @@
                     </div>
 
                     <div id="drop-zone-sql" class="drop-zone glass p-5 mt-4 text-center">
-                        <i class="fa-solid fa-cloud-arrow-up text-teal" style="font-size:32px; margin-bottom:12px;"></i>
+                        <i class="fa-solid fa-cloud-arrow-up text-teal" style="font-size:36px; margin-bottom:14px;"></i>
                         <h4>Drag & Drop SQL Dump File Here</h4>
                         <span class="text-muted text-small">Click or drag a <code>.sql</code> script file to execute batch imports.</span>
                     </div>
