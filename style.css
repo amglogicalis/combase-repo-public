@@ -387,11 +387,26 @@ body {
 }
 
 .table-card {
-  padding: 24px 28px;
+  padding: 26px 28px;
   border-radius: 16px;
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 18px;
+}
+
+.table-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  margin-bottom: 6px;
+}
+
+.table-card-title {
+  font-size: 16px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
 }
 
 .bridge-card {
@@ -445,6 +460,8 @@ body {
   border-radius: 6px;
   font-size: 11px;
   font-weight: 600;
+  display: inline-flex;
+  align-items: center;
 }
 
 .badge-teal {
@@ -494,6 +511,10 @@ body {
   align-items: center;
   justify-content: center;
   z-index: 999;
+}
+
+.modal-backdrop.z-top {
+  z-index: 1050 !important;
 }
 
 .modal-card {

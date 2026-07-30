@@ -7,6 +7,16 @@ class CombaseStudioApp {
     this.currentRenameTable = null;
     this.currentInspectTable = null;
 
+    // Dynamic Time-Travel Commit Checkpoints History
+    this.commitHistory = [
+      {
+        sha: 'b14c9ef',
+        message: 'Initial Database Initialization',
+        timestamp: new Date().toISOString(),
+        snapshot: null
+      }
+    ];
+
     // Multi-Database State Store (Pre-populated demo tables)
     this.databases = {
       default_db: {
@@ -79,6 +89,9 @@ class CombaseStudioApp {
       }
     };
 
+    // Save initial snapshot
+    this.commitHistory[0].snapshot = JSON.parse(JSON.stringify(this.databases));
+
     this.initElements();
     this.attachEventListeners();
     this.checkAuth();
@@ -90,6 +103,20 @@ class CombaseStudioApp {
       this.databases[this.activeDb] = { schemas: {}, tables: {} };
     }
     return this.databases[this.activeDb];
+  }
+
+  recordGitCheckpoint(message) {
+    const sha = Math.random().toString(16).substring(2, 9);
+    const snapshot = JSON.parse(JSON.stringify(this.databases));
+    const newCommit = {
+      sha,
+      message,
+      timestamp: new Date().toISOString(),
+      snapshot
+    };
+
+    this.commitHistory.unshift(newCommit);
+    this.renderTimeTravel();
   }
 
   initElements() {
@@ -161,6 +188,8 @@ class CombaseStudioApp {
     this.importProviderType = document.getElementById('import-provider-type');
     this.importProviderTextarea = document.getElementById('import-provider-textarea');
 
+    this.timetravelContainer = document.getElementById('timetravel-history-container');
+
     if (this.token && this.tokenInput) {
       this.tokenInput.value = this.token;
     }
@@ -202,6 +231,7 @@ class CombaseStudioApp {
         this.activeDb = dbName;
         this.inputNewDbName.value = '';
         this.modalNewDb.classList.add('hidden');
+        this.recordGitCheckpoint(`Created Database '${dbName}'`);
         this.updateDbState();
         this.showToast('Success', `Database '${dbName}' created`, 'success');
       }
@@ -220,6 +250,7 @@ class CombaseStudioApp {
         this.activeBranch = branchName;
         this.inputNewBranchName.value = '';
         this.modalNewBranch.classList.add('hidden');
+        this.recordGitCheckpoint(`Created Branch '${branchName}'`);
         this.showToast('Branch Created', `Branch '${branchName}' active`, 'success');
       }
     });
@@ -328,7 +359,10 @@ class CombaseStudioApp {
   }
 
   closeAllModals() {
-    document.querySelectorAll('.modal-backdrop').forEach(m => m.classList.add('hidden'));
+    document.querySelectorAll('.modal-backdrop').forEach(m => {
+      m.classList.add('hidden');
+      m.classList.remove('z-top');
+    });
   }
 
   showConfirmModal(title, message, onConfirm) {
@@ -497,6 +531,7 @@ class CombaseStudioApp {
             updatedAt: new Date().toISOString()
           };
           this.dbState.tables[tableName] = this.dbState.tables[tableName] || [];
+          this.recordGitCheckpoint(`SQL: CREATE TABLE ${tableName}`);
         }
         this.renderQueryResult([], 0, Date.now() - startTime, 1);
 
@@ -510,6 +545,7 @@ class CombaseStudioApp {
             delete this.dbState.schemas[oldName];
             this.dbState.tables[newName] = this.dbState.tables[oldName] || [];
             delete this.dbState.tables[oldName];
+            this.recordGitCheckpoint(`SQL: RENAME ${oldName} -> ${newName}`);
           }
         }
         this.renderQueryResult([], 0, Date.now() - startTime, 1);
@@ -528,6 +564,7 @@ class CombaseStudioApp {
             row[col.name] = values[idx] || null;
           });
           this.dbState.tables[tableName].push(row);
+          this.recordGitCheckpoint(`SQL: INSERT INTO ${tableName}`);
           this.renderQueryResult([row], 1, Date.now() - startTime, 1);
         }
 
@@ -553,6 +590,7 @@ class CombaseStudioApp {
           const tableName = match[1];
           delete this.dbState.schemas[tableName];
           delete this.dbState.tables[tableName];
+          this.recordGitCheckpoint(`SQL: DROP TABLE ${tableName}`);
           this.renderQueryResult([], 0, Date.now() - startTime, 1);
         }
 
@@ -632,16 +670,16 @@ class CombaseStudioApp {
       card.className = 'table-card glass';
       card.innerHTML = `
         <div class="table-card-header">
-          <h4><i class="fa-solid fa-table text-teal mr-2"></i> ${s.name}</h4>
+          <h4 class="table-card-title"><i class="fa-solid fa-table text-teal mr-2"></i> ${s.name}</h4>
           <span class="badge badge-teal font-code">${rows.length} rows</span>
         </div>
         
-        <div class="text-small text-muted mt-1">Columns:</div>
-        <div class="font-code text-small" style="color: #2dd4bf;">
+        <div class="text-small text-muted mt-2">Columns:</div>
+        <div class="font-code text-small mt-1" style="color: #2dd4bf; line-height: 1.5;">
           ${s.columns.map(c => `${c.name} (${c.type})`).join(', ')}
         </div>
 
-        <div class="flex gap-2 mt-3 flex-wrap">
+        <div class="flex gap-2 mt-4 flex-wrap">
           <button class="btn btn-primary btn-sm flex-1" onclick="app.inspectTable('${s.name}')">
             <i class="fa-solid fa-eye"></i> Open Table
           </button>
@@ -706,6 +744,7 @@ class CombaseStudioApp {
     });
 
     this.dbState.tables[tableName].push(newRow);
+    this.recordGitCheckpoint(`Visual: Added new row to '${tableName}'`);
     this.updateDbState();
     this.inspectTable(tableName);
     this.showToast('Row Created', `Visual row added to ${tableName}`, 'success');
@@ -719,10 +758,15 @@ class CombaseStudioApp {
 
     const saveCell = () => {
       const newVal = input.value;
-      this.dbState.tables[tableName][rowIdx][colName] = newVal;
-      this.updateDbState();
-      tdElement.innerHTML = newVal !== '' ? newVal : '<span class="text-muted">NULL</span>';
-      this.showToast('Updated', `Cell updated to "${newVal}"`, 'success');
+      if (this.dbState.tables[tableName][rowIdx][colName] !== newVal) {
+        this.dbState.tables[tableName][rowIdx][colName] = newVal;
+        this.recordGitCheckpoint(`Visual: Updated cell '${colName}' in '${tableName}' to "${newVal}"`);
+        this.updateDbState();
+        tdElement.innerHTML = newVal !== '' ? newVal : '<span class="text-muted">NULL</span>';
+        this.showToast('Updated', `Cell updated to "${newVal}"`, 'success');
+      } else {
+        tdElement.innerHTML = newVal !== '' ? newVal : '<span class="text-muted">NULL</span>';
+      }
     };
 
     input.onblur = saveCell;
@@ -742,12 +786,13 @@ class CombaseStudioApp {
       this.appendColumnRow(c.name, c.type, c.primaryKey);
     });
 
+    this.modalManageColumns.classList.add('z-top');
     this.modalManageColumns.classList.remove('hidden');
   }
 
   appendColumnRow(name = '', type = 'TEXT', isPk = false) {
     const row = document.createElement('div');
-    row.className = 'flex gap-2 align-center column-manage-row';
+    row.className = 'flex gap-2 align-center column-manage-row mb-2';
     row.innerHTML = `
       <input type="text" class="input-text flex-1 col-name-input" value="${name}" placeholder="Column Name" />
       <select class="select-input col-type-select">
@@ -783,7 +828,9 @@ class CombaseStudioApp {
     }
 
     this.dbState.schemas[tableName].columns = newCols;
+    this.recordGitCheckpoint(`Visual: Updated schema & columns for '${tableName}'`);
     this.modalManageColumns.classList.add('hidden');
+    this.modalManageColumns.classList.remove('z-top');
     this.updateDbState();
     this.inspectTable(tableName);
     this.showToast('Schema Updated', `Updated schema for '${tableName}' visually!`, 'success');
@@ -792,6 +839,7 @@ class CombaseStudioApp {
   deleteRow(tableName, rowIndex) {
     if (this.dbState.tables[tableName]) {
       this.dbState.tables[tableName].splice(rowIndex, 1);
+      this.recordGitCheckpoint(`Visual: Deleted row at index ${rowIndex} from '${tableName}'`);
       this.updateDbState();
       this.inspectTable(tableName);
       this.showToast('Row Deleted', `Deleted row at index ${rowIndex} from ${tableName}`, 'success');
@@ -842,6 +890,7 @@ class CombaseStudioApp {
       }
 
       this.importProviderTextarea.value = '';
+      this.recordGitCheckpoint('Imported data from external provider');
       this.updateDbState();
       this.showToast('Import Complete', 'External provider data imported into COMBASE!', 'success');
 
@@ -852,18 +901,32 @@ class CombaseStudioApp {
 
   renderTimeTravel() {
     if (!this.timetravelContainer) return;
-    this.timetravelContainer.innerHTML = `
-      <div class="glass p-4 flex align-center justify-between">
+    this.timetravelContainer.innerHTML = '';
+
+    this.commitHistory.forEach((c, idx) => {
+      const card = document.createElement('div');
+      card.className = 'glass p-4 flex align-center justify-between';
+      card.innerHTML = `
         <div>
-          <span class="badge badge-teal font-code mr-2">HEAD</span>
-          <span class="font-bold">Initial Database Checkpoint</span>
-          <span class="text-muted text-small ml-2">• Just now</span>
+          <span class="badge badge-teal font-code mr-2">${c.sha}</span>
+          <span class="font-bold">${c.message}</span>
+          <span class="text-muted text-small ml-2">• ${new Date(c.timestamp).toLocaleTimeString()}</span>
         </div>
-        <button class="btn btn-secondary btn-sm" onclick="app.showToast('Time-Travel', 'Restored to HEAD checkpoint', 'success')">
-          <i class="fa-solid fa-rotate-left"></i> Restore
+        <button class="btn btn-secondary btn-sm" onclick="app.restoreCheckpoint('${c.sha}')">
+          <i class="fa-solid fa-rotate-left"></i> Restore State
         </button>
-      </div>
-    `;
+      `;
+      this.timetravelContainer.appendChild(card);
+    });
+  }
+
+  restoreCheckpoint(sha) {
+    const commit = this.commitHistory.find(c => c.sha === sha);
+    if (!commit || !commit.snapshot) return;
+
+    this.databases = JSON.parse(JSON.stringify(commit.snapshot));
+    this.updateDbState();
+    this.showToast('State Restored', `Restored database to checkpoint ${sha}`, 'success');
   }
 
   generateProviderScript(provider) {
