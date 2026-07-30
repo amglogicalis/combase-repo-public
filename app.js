@@ -11,13 +11,79 @@ class CombaseStudioApp {
     // Dynamic Time-Travel Commit Checkpoints History
     this.commitHistory = [];
 
-    // Strictly Empty Database State (NO Guest Mode, NO Dummy Data)
-    this.databases = {
+    // Initial Demo Database Template
+    this.defaultDatabases = {
       default_db: {
-        schemas: {},
-        tables: {}
+        schemas: {
+          users: {
+            name: 'users',
+            columns: [
+              { name: 'id', type: 'INTEGER', primaryKey: true },
+              { name: 'name', type: 'TEXT' },
+              { name: 'email', type: 'TEXT' },
+              { name: 'role', type: 'TEXT' }
+            ],
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString()
+          },
+          products: {
+            name: 'products',
+            columns: [
+              { name: 'id', type: 'INTEGER', primaryKey: true },
+              { name: 'title', type: 'TEXT' },
+              { name: 'price', type: 'REAL' },
+              { name: 'category', type: 'TEXT' }
+            ],
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString()
+          },
+          orders: {
+            name: 'orders',
+            columns: [
+              { name: 'order_id', type: 'INTEGER', primaryKey: true },
+              { name: 'user_id', type: 'INTEGER' },
+              { name: 'total_amount', type: 'REAL' },
+              { name: 'status', type: 'TEXT' }
+            ],
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString()
+          },
+          system_logs: {
+            name: 'system_logs',
+            columns: [
+              { name: 'id', type: 'INTEGER', primaryKey: true },
+              { name: 'event', type: 'TEXT' },
+              { name: 'level', type: 'TEXT' },
+              { name: 'timestamp', type: 'DATETIME' }
+            ],
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString()
+          }
+        },
+        tables: {
+          users: [
+            { id: 1, name: 'Adrián', email: 'adrian@terra.org', role: 'Admin' },
+            { id: 2, name: 'Combase Bot', email: 'bot@terra.org', role: 'System Engine' },
+            { id: 3, name: 'Elena García', email: 'elena@terra.org', role: 'Developer' }
+          ],
+          products: [
+            { id: 101, title: 'Terra AI Serverless Runner', price: 0.00, category: 'Compute' },
+            { id: 102, title: 'Rolla Storage Vault 1TB', price: 0.00, category: 'Storage' },
+            { id: 103, title: 'Webbl CDN Global Edge', price: 0.00, category: 'Hosting' }
+          ],
+          orders: [
+            { order_id: 5001, user_id: 1, total_amount: 0.00, status: 'COMPLETED' },
+            { order_id: 5002, user_id: 3, total_amount: 0.00, status: 'PROCESSING' }
+          ],
+          system_logs: [
+            { id: 1, event: 'COMBASE Initialized', level: 'INFO', timestamp: new Date().toISOString() },
+            { id: 2, event: 'Zero-Copy Checkpoint Created', level: 'INFO', timestamp: new Date().toISOString() }
+          ]
+        }
       }
     };
+
+    this.databases = JSON.parse(JSON.stringify(this.defaultDatabases));
 
     this.initElements();
     this.attachEventListeners();
@@ -42,23 +108,22 @@ class CombaseStudioApp {
     this.vaultFileSha = null;
     localStorage.removeItem('combase_gh_token');
 
-    // Wipe memory
-    this.databases = { default_db: { schemas: {}, tables: {} } };
+    // Reset Databases
+    this.databases = JSON.parse(JSON.stringify(this.defaultDatabases));
     this.commitHistory = [];
 
     document.getElementById('view-auth-required').classList.remove('hidden');
     document.getElementById('authenticated-content').classList.add('hidden');
-    document.getElementById('controls-bar').classList.add('hidden');
     document.getElementById('token-group').classList.remove('hidden');
     document.getElementById('btn-disconnect').classList.add('hidden');
 
     this.navItems.forEach(item => item.classList.add('disabled'));
 
     this.userProfile.innerHTML = `
-      <div class="avatar-placeholder"><i class="fa-solid fa-lock text-danger"></i></div>
+      <div class="avatar-placeholder"><i class="fa-regular fa-user"></i></div>
       <div class="user-info">
-        <span class="user-name">Locked Console</span>
-        <span class="user-status text-danger"><i class="fa-solid fa-circle" style="font-size:8px;"></i> Access Restricted</span>
+        <span class="user-name">Guest Mode</span>
+        <span class="user-status text-danger"><i class="fa-solid fa-circle" style="font-size:8px;"></i> Disconnected</span>
       </div>
     `;
 
@@ -68,7 +133,6 @@ class CombaseStudioApp {
   showAuthenticatedScreen() {
     document.getElementById('view-auth-required').classList.add('hidden');
     document.getElementById('authenticated-content').classList.remove('hidden');
-    document.getElementById('controls-bar').classList.remove('hidden');
     document.getElementById('token-group').classList.add('hidden');
     document.getElementById('btn-disconnect').classList.remove('hidden');
 
@@ -168,6 +232,10 @@ class CombaseStudioApp {
           },
           body: JSON.stringify({ name: repo, private: true, auto_init: true })
         });
+
+        // Initialize with default demo tables
+        this.databases = JSON.parse(JSON.stringify(this.defaultDatabases));
+        await this.pushToGitHubVault('Initialize COMBASE storage vault');
         this.showToast('Storage Initialized', 'Created private .combase-storage repo', 'info');
         return;
       }
@@ -186,6 +254,10 @@ class CombaseStudioApp {
         this.databases = remoteData;
         this.updateDbState();
         this.showToast('Vault Loaded', 'Database loaded from GitHub .combase-storage!', 'success');
+      } else {
+        // If file doesn't exist yet, push default tables
+        this.databases = JSON.parse(JSON.stringify(this.defaultDatabases));
+        await this.pushToGitHubVault('Initialize default database schema');
       }
 
       // 3. Fetch Commit History
@@ -581,7 +653,7 @@ class CombaseStudioApp {
       this.showLockScreen();
       this.showToast('Authentication Failed', 'Invalid or expired GitHub PAT Token.', 'error');
     } finally {
-      this.btnConnect.innerHTML = 'Connect & Unlock';
+      this.btnConnect.innerHTML = 'Connect';
     }
   }
 
@@ -597,7 +669,7 @@ class CombaseStudioApp {
 
   disconnect() {
     this.showLockScreen();
-    this.showToast('Console Locked', 'Session terminated. Access restricted.', 'info');
+    this.showToast('Disconnected', 'Session terminated. Access restricted.', 'info');
   }
 
   updateDbState() {
