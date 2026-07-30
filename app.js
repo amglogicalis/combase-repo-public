@@ -4,6 +4,7 @@ class CombaseStudioApp {
     this.activeDb = 'default_db';
     this.activeBranch = 'main';
     this.user = null;
+    this.currentRenameTable = null;
 
     // Multi-Database State Store (Pre-populated demo tables)
     this.databases = {
@@ -127,11 +128,22 @@ class CombaseStudioApp {
     this.modalCreateTable = document.getElementById('modal-create-table');
     this.btnConfirmCreateTable = document.getElementById('btn-confirm-create-table');
 
+    this.modalRenameTable = document.getElementById('modal-rename-table');
+    this.renameTableOldName = document.getElementById('rename-table-old-name');
+    this.inputRenameTableNew = document.getElementById('input-rename-table-new');
+    this.btnConfirmRenameTable = document.getElementById('btn-confirm-rename-table');
+
     this.modalInspectTable = document.getElementById('modal-inspect-table');
     this.inspectTableTitle = document.getElementById('inspect-table-title');
     this.inspectTableSubtitle = document.getElementById('inspect-table-subtitle');
     this.inspectTableGrid = document.getElementById('inspect-table-grid');
     this.btnInspectInsertRow = document.getElementById('btn-inspect-insert-row');
+
+    this.modalCustomConfirm = document.getElementById('modal-custom-confirm');
+    this.confirmModalTitle = document.getElementById('confirm-modal-title');
+    this.confirmModalMessage = document.getElementById('confirm-modal-message');
+    this.btnConfirmOk = document.getElementById('btn-confirm-ok');
+    this.btnConfirmCancel = document.getElementById('btn-confirm-cancel');
 
     this.modalCodeGen = document.getElementById('modal-code-generator');
     this.codeGenTitle = document.getElementById('code-gen-title');
@@ -228,6 +240,17 @@ class CombaseStudioApp {
       }
     });
 
+    this.btnConfirmRenameTable.addEventListener('click', () => {
+      const newName = this.inputRenameTableNew.value.trim();
+      if (this.currentRenameTable && newName) {
+        const sql = `ALTER TABLE ${this.currentRenameTable} RENAME TO ${newName};`;
+        this.sqlEditor.value = sql;
+        this.executeSql();
+        this.modalRenameTable.classList.add('hidden');
+        this.showToast('Renamed', `Table renamed to '${newName}'`, 'success');
+      }
+    });
+
     // Modal Close buttons
     document.querySelectorAll('.btn-close, .btn-cancel').forEach(btn => {
       btn.addEventListener('click', () => this.closeAllModals());
@@ -275,6 +298,18 @@ class CombaseStudioApp {
 
   closeAllModals() {
     document.querySelectorAll('.modal-backdrop').forEach(m => m.classList.add('hidden'));
+  }
+
+  showConfirmModal(title, message, onConfirm) {
+    this.confirmModalTitle.innerHTML = `<i class="fa-solid fa-triangle-exclamation text-teal mr-2"></i> ${title}`;
+    this.confirmModalMessage.textContent = message;
+    
+    this.btnConfirmOk.onclick = () => {
+      this.modalCustomConfirm.classList.add('hidden');
+      onConfirm();
+    };
+
+    this.modalCustomConfirm.classList.remove('hidden');
   }
 
   switchView(viewId) {
@@ -434,6 +469,20 @@ class CombaseStudioApp {
         }
         this.renderQueryResult([], 0, Date.now() - startTime, 1);
 
+      } else if (upper.startsWith('ALTER TABLE')) {
+        const match = sql.match(/ALTER\s+TABLE\s+([a-zA-Z0-9_-]+)\s+RENAME\s+TO\s+([a-zA-Z0-9_-]+)/i);
+        if (match) {
+          const oldName = match[1];
+          const newName = match[2];
+          if (this.dbState.schemas[oldName]) {
+            this.dbState.schemas[newName] = { ...this.dbState.schemas[oldName], name: newName };
+            delete this.dbState.schemas[oldName];
+            this.dbState.tables[newName] = this.dbState.tables[oldName] || [];
+            delete this.dbState.tables[oldName];
+          }
+        }
+        this.renderQueryResult([], 0, Date.now() - startTime, 1);
+
       } else if (upper.startsWith('INSERT INTO')) {
         const match = sql.match(/INSERT\s+INTO\s+([a-zA-Z0-9_-]+)\s*(\(([^)]+)\))?\s*VALUES\s*\(([\s\S]+)\)/i);
         if (match) {
@@ -561,9 +610,12 @@ class CombaseStudioApp {
           ${s.columns.map(c => `${c.name} (${c.type})`).join(', ')}
         </div>
 
-        <div class="flex gap-2 mt-3">
+        <div class="flex gap-2 mt-3 flex-wrap">
           <button class="btn btn-primary btn-sm flex-1" onclick="app.inspectTable('${s.name}')">
             <i class="fa-solid fa-eye"></i> Open Table
+          </button>
+          <button class="btn btn-secondary btn-sm" onclick="app.openRenameModal('${s.name}')" title="Rename Table">
+            <i class="fa-solid fa-pen"></i> Rename
           </button>
           <button class="btn btn-danger-outline btn-sm" onclick="app.dropTable('${s.name}')" title="Drop Table">
             <i class="fa-solid fa-trash-can"></i>
@@ -572,6 +624,13 @@ class CombaseStudioApp {
       `;
       this.tablesCardsGrid.appendChild(card);
     });
+  }
+
+  openRenameModal(tableName) {
+    this.currentRenameTable = tableName;
+    this.renameTableOldName.textContent = tableName;
+    this.inputRenameTableNew.value = tableName;
+    this.modalRenameTable.classList.remove('hidden');
   }
 
   inspectTable(tableName) {
@@ -588,13 +647,14 @@ class CombaseStudioApp {
       const headers = schema.columns.map(c => c.name);
       let html = `<table class="data-table"><thead><tr>`;
       headers.forEach(h => { html += `<th>${h}</th>`; });
-      html += `</tr></thead><tbody>`;
+      html += `<th style="text-align:right;">Actions</th></tr></thead><tbody>`;
 
-      rows.forEach(r => {
+      rows.forEach((r, idx) => {
         html += `<tr>`;
         headers.forEach(h => {
           html += `<td>${r[h] !== null && r[h] !== undefined ? r[h] : '<span class="text-muted">NULL</span>'}</td>`;
         });
+        html += `<td style="text-align:right;"><button class="btn btn-danger-outline btn-xs" onclick="app.deleteRow('${tableName}', ${idx})"><i class="fa-solid fa-trash"></i></button></td>`;
         html += `</tr>`;
       });
       html += `</tbody></table>`;
@@ -611,12 +671,25 @@ class CombaseStudioApp {
     this.modalInspectTable.classList.remove('hidden');
   }
 
-  dropTable(tableName) {
-    if (confirm(`Are you sure you want to DROP table '${tableName}'?`)) {
-      this.sqlEditor.value = `DROP TABLE ${tableName};`;
-      this.executeSql();
-      this.showToast('Dropped', `Table '${tableName}' dropped.`, 'success');
+  deleteRow(tableName, rowIndex) {
+    if (this.dbState.tables[tableName]) {
+      this.dbState.tables[tableName].splice(rowIndex, 1);
+      this.updateDbState();
+      this.inspectTable(tableName);
+      this.showToast('Row Deleted', `Deleted row at index ${rowIndex} from ${tableName}`, 'success');
     }
+  }
+
+  dropTable(tableName) {
+    this.showConfirmModal(
+      'Drop Table Warning',
+      `Are you sure you want to DROP table '${tableName}'? All records will be permanently deleted.`,
+      () => {
+        this.sqlEditor.value = `DROP TABLE ${tableName};`;
+        this.executeSql();
+        this.showToast('Dropped', `Table '${tableName}' dropped.`, 'success');
+      }
+    );
   }
 
   renderTimeTravel() {
