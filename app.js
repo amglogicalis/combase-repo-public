@@ -11,7 +11,7 @@ class CombaseStudioApp {
     // Dynamic Time-Travel Commit Checkpoints History
     this.commitHistory = [];
 
-    // Strictly Clean Empty Database State (NO Demo Rows)
+    // Strictly Clean Empty Database State
     this.databases = {
       default_db: {
         schemas: {},
@@ -27,6 +27,42 @@ class CombaseStudioApp {
     } else {
       this.showLockScreen();
     }
+  }
+
+  cleanDatabaseMap(data) {
+    if (!data || typeof data !== 'object') {
+      return { default_db: { schemas: {}, tables: {} } };
+    }
+
+    // If root data itself is a single database structure
+    if (data.schemas && data.tables) {
+      return {
+        default_db: {
+          schemas: data.schemas || {},
+          tables: data.tables || {}
+        }
+      };
+    }
+
+    // Filter keys to keep only valid database objects (exclude version, branch, schemas, tables root keys)
+    const cleaned = {};
+    Object.keys(data).forEach(key => {
+      if (['version', 'branch', 'sha', 'timestamp', 'updatedAt', 'schemas', 'tables'].includes(key)) return;
+
+      const val = data[key];
+      if (val && typeof val === 'object' && !Array.isArray(val)) {
+        cleaned[key] = {
+          schemas: val.schemas || {},
+          tables: val.tables || {}
+        };
+      }
+    });
+
+    if (Object.keys(cleaned).length === 0) {
+      cleaned['default_db'] = { schemas: {}, tables: {} };
+    }
+
+    return cleaned;
   }
 
   get dbState() {
@@ -93,7 +129,8 @@ class CombaseStudioApp {
       const repo = '.combase-storage';
       const path = 'db.json';
 
-      // Convert content to utf-8 base64
+      // Ensure databases map is clean before saving
+      this.databases = this.cleanDatabaseMap(this.databases);
       const jsonStr = JSON.stringify(this.databases, null, 2);
       const contentBase64 = btoa(unescape(encodeURIComponent(jsonStr)));
 
@@ -181,7 +218,11 @@ class CombaseStudioApp {
         const decodedStr = decodeURIComponent(escape(atob(fileData.content.replace(/\n/g, ''))));
         const remoteData = JSON.parse(decodedStr);
 
-        this.databases = remoteData;
+        this.databases = this.cleanDatabaseMap(remoteData);
+        const validDbs = Object.keys(this.databases);
+        if (validDbs.length && !validDbs.includes(this.activeDb)) {
+          this.activeDb = validDbs[0];
+        }
         this.updateDbState();
         this.showToast('Vault Loaded', 'Database loaded from GitHub .combase-storage!', 'success');
       }
@@ -377,7 +418,9 @@ class CombaseStudioApp {
       this.btnDeleteActiveDb.addEventListener('click', (e) => {
         e.preventDefault();
         const currentDb = this.activeDb;
-        if (currentDb === 'default_db' && Object.keys(this.databases).length === 1) {
+        const validDbs = Object.keys(this.databases).filter(k => !['version', 'branch', 'sha', 'timestamp', 'updatedAt', 'schemas', 'tables'].includes(k));
+
+        if (currentDb === 'default_db' && validDbs.length <= 1) {
           this.showConfirmModal(
             'Clear Default Database Warning',
             `Are you sure you want to clear all tables and schemas in 'default_db'?`,
@@ -396,7 +439,7 @@ class CombaseStudioApp {
           `Are you sure you want to delete database '${currentDb}' and all its tables?`,
           () => {
             delete this.databases[currentDb];
-            const remainingDbs = Object.keys(this.databases);
+            const remainingDbs = Object.keys(this.databases).filter(k => !['version', 'branch', 'sha', 'timestamp', 'updatedAt', 'schemas', 'tables'].includes(k));
             this.activeDb = remainingDbs[0] || 'default_db';
             if (!this.databases[this.activeDb]) {
               this.databases[this.activeDb] = { schemas: {}, tables: {} };
@@ -584,12 +627,21 @@ class CombaseStudioApp {
   renderDbDropdown() {
     if (!this.dbSelect) return;
     this.dbSelect.innerHTML = '';
-    Object.keys(this.databases).forEach(dbName => {
+    
+    // Clean data map
+    this.databases = this.cleanDatabaseMap(this.databases);
+    const dbNames = Object.keys(this.databases);
+
+    dbNames.forEach(dbName => {
       const opt = document.createElement('option');
       opt.value = dbName;
       opt.textContent = dbName;
       this.dbSelect.appendChild(opt);
     });
+
+    if (!dbNames.includes(this.activeDb)) {
+      this.activeDb = dbNames[0] || 'default_db';
+    }
     this.dbSelect.value = this.activeDb;
   }
 
