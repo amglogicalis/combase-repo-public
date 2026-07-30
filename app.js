@@ -355,7 +355,7 @@ class CombaseStudioApp {
           <span class="badge badge-primary font-code">${rowCount} rows</span>
         </div>
         <div class="text-small text-muted mt-2">Columns:</div>
-        <div class="font-code text-small" style="color: #a5b4fc;">
+        <div class="font-code text-small" style="color: #2dd4bf;">
           ${s.columns.map(c => `${c.name} (${c.type})`).join(', ')}
         </div>
       `;

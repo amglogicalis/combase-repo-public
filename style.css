@@ -1,14 +1,14 @@
 :root {
-  --bg: #090a0f;
+  --bg: #070a0e;
   --bg-card: rgba(255, 255, 255, 0.04);
   --bg-card-hover: rgba(255, 255, 255, 0.07);
   --border: rgba(255, 255, 255, 0.09);
-  --border-glow: rgba(99, 102, 241, 0.4);
-  --primary: #6366f1;
-  --primary-hover: #4f46e5;
-  --primary-glow: rgba(99, 102, 241, 0.25);
-  --accent: #10b981;
-  --accent-glow: rgba(16, 185, 129, 0.25);
+  --border-glow: rgba(1, 93, 81, 0.5);
+  --primary: #015d51;
+  --primary-hover: #027a6b;
+  --primary-glow: rgba(1, 93, 81, 0.35);
+  --accent: #14b8a6;
+  --accent-glow: rgba(20, 184, 166, 0.25);
   --danger: #ef4444;
   --text: #f8fafc;
   --text-muted: #94a3b8;
@@ -47,7 +47,7 @@ body {
 
 /* Sidebar */
 .sidebar {
-  background: rgba(13, 14, 22, 0.95);
+  background: rgba(8, 12, 17, 0.95);
   border-right: 1px solid var(--border);
   display: flex;
   flex-direction: column;
@@ -62,23 +62,25 @@ body {
 }
 
 .logo-img {
-  width: 38px;
-  height: 38px;
-  border-radius: 8px;
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  object-fit: cover;
+  border: 1px solid var(--border-glow);
 }
 
 .logo-text {
   font-size: 20px;
   font-weight: 700;
-  background: linear-gradient(135deg, #a5b4fc, #6366f1);
+  background: linear-gradient(135deg, #2dd4bf, #015d51);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
 }
 
 .logo-tag {
   font-size: 10px;
-  background: rgba(99, 102, 241, 0.15);
-  color: var(--primary);
+  background: rgba(1, 93, 81, 0.25);
+  color: #2dd4bf;
   padding: 2px 6px;
   border-radius: 4px;
 }
@@ -306,7 +308,7 @@ body {
   background: rgba(0, 0, 0, 0.5);
   border: 1px solid var(--border);
   border-radius: 8px;
-  color: #a5b4fc;
+  color: #2dd4bf;
   font-family: var(--font-code);
   font-size: 13px;
   padding: 14px;
