@@ -61,7 +61,7 @@
         <main class="main-content">
             <!-- Top Bar -->
             <header class="topbar">
-                <div class="controls-bar flex align-center gap-3 flex-wrap">
+                <div class="controls-bar flex align-center gap-3 flex-wrap hidden" id="controls-bar">
                     <!-- Database Switcher -->
                     <div class="control-group flex align-center gap-2">
                         <span class="text-small text-muted font-bold"><i class="fa-solid fa-database text-teal"></i> DB:</span>
@@ -70,6 +70,9 @@
                         </select>
                         <button class="btn btn-secondary btn-sm" id="btn-open-new-db" title="Create new database">
                             <i class="fa-solid fa-plus"></i> New DB
+                        </button>
+                        <button class="btn btn-danger-outline btn-sm" id="btn-delete-active-db" title="Delete active database">
+                            <i class="fa-solid fa-trash-can"></i>
                         </button>
                     </div>
 
@@ -83,6 +86,9 @@
                         </select>
                         <button class="btn btn-secondary btn-sm" id="btn-open-new-branch" title="Create database branch">
                             <i class="fa-solid fa-plus"></i> New Branch
+                        </button>
+                        <button class="btn btn-danger-outline btn-sm" id="btn-delete-active-branch" title="Delete active branch">
+                            <i class="fa-solid fa-trash-can"></i>
                         </button>
                     </div>
                 </div>

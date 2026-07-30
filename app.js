@@ -48,6 +48,7 @@ class CombaseStudioApp {
 
     document.getElementById('view-auth-required').classList.remove('hidden');
     document.getElementById('authenticated-content').classList.add('hidden');
+    document.getElementById('controls-bar').classList.add('hidden');
     document.getElementById('token-group').classList.remove('hidden');
     document.getElementById('btn-disconnect').classList.add('hidden');
 
@@ -67,6 +68,7 @@ class CombaseStudioApp {
   showAuthenticatedScreen() {
     document.getElementById('view-auth-required').classList.add('hidden');
     document.getElementById('authenticated-content').classList.remove('hidden');
+    document.getElementById('controls-bar').classList.remove('hidden');
     document.getElementById('token-group').classList.add('hidden');
     document.getElementById('btn-disconnect').classList.remove('hidden');
 
@@ -220,12 +222,14 @@ class CombaseStudioApp {
 
     this.dbSelect = document.getElementById('db-select');
     this.btnOpenNewDb = document.getElementById('btn-open-new-db');
+    this.btnDeleteActiveDb = document.getElementById('btn-delete-active-db');
     this.modalNewDb = document.getElementById('modal-new-db');
     this.btnConfirmNewDb = document.getElementById('btn-confirm-new-db');
     this.inputNewDbName = document.getElementById('input-new-db-name');
 
     this.branchSelect = document.getElementById('branch-select');
     this.btnOpenNewBranch = document.getElementById('btn-open-new-branch');
+    this.btnDeleteActiveBranch = document.getElementById('btn-delete-active-branch');
     this.modalNewBranch = document.getElementById('modal-new-branch');
     this.btnConfirmNewBranch = document.getElementById('btn-confirm-new-branch');
     this.inputNewBranchName = document.getElementById('input-new-branch-name');
@@ -340,6 +344,32 @@ class CombaseStudioApp {
       }
     });
 
+    // Delete Active DB
+    if (this.btnDeleteActiveDb) {
+      this.btnDeleteActiveDb.addEventListener('click', () => {
+        if (this.activeDb === 'default_db' && Object.keys(this.databases).length === 1) {
+          this.showToast('Error', 'Cannot delete default_db when it is the only database.', 'error');
+          return;
+        }
+        this.showConfirmModal(
+          'Delete Database Warning',
+          `Are you sure you want to delete database '${this.activeDb}' and all its tables?`,
+          () => {
+            delete this.databases[this.activeDb];
+            const remainingDbs = Object.keys(this.databases);
+            this.activeDb = remainingDbs[0] || 'default_db';
+            if (!this.databases[this.activeDb]) {
+              this.databases[this.activeDb] = { schemas: {}, tables: {} };
+            }
+            this.renderDbDropdown();
+            this.persistCurrentState(`Deleted Database '${this.activeDb}'`);
+            this.updateDbState();
+            this.showToast('Deleted', `Database deleted. Active DB: ${this.activeDb}`, 'success');
+          }
+        );
+      });
+    }
+
     // Branch Switcher
     this.btnOpenNewBranch.addEventListener('click', () => this.modalNewBranch.classList.remove('hidden'));
     this.btnConfirmNewBranch.addEventListener('click', () => {
@@ -357,6 +387,28 @@ class CombaseStudioApp {
         this.showToast('Branch Created', `Branch '${branchName}' active`, 'success');
       }
     });
+
+    // Delete Active Branch
+    if (this.btnDeleteActiveBranch) {
+      this.btnDeleteActiveBranch.addEventListener('click', () => {
+        if (this.activeBranch === 'main') {
+          this.showToast('Error', 'Cannot delete main branch.', 'error');
+          return;
+        }
+        this.showConfirmModal(
+          'Delete Branch Warning',
+          `Are you sure you want to delete database branch '${this.activeBranch}'?`,
+          () => {
+            const deleted = this.activeBranch;
+            const opt = this.branchSelect.querySelector(`option[value="${deleted}"]`);
+            if (opt) opt.remove();
+            this.activeBranch = 'main';
+            this.branchSelect.value = 'main';
+            this.showToast('Branch Deleted', `Deleted branch '${deleted}'. Switched to main.`, 'success');
+          }
+        );
+      });
+    }
 
     // SQL Runner
     this.btnSqlRun.addEventListener('click', () => this.executeSql());
@@ -461,6 +513,18 @@ class CombaseStudioApp {
     }
   }
 
+  renderDbDropdown() {
+    if (!this.dbSelect) return;
+    this.dbSelect.innerHTML = '';
+    Object.keys(this.databases).forEach(dbName => {
+      const opt = document.createElement('option');
+      opt.value = dbName;
+      opt.textContent = dbName;
+      this.dbSelect.appendChild(opt);
+    });
+    this.dbSelect.value = this.activeDb;
+  }
+
   closeAllModals() {
     document.querySelectorAll('.modal-backdrop').forEach(m => {
       m.classList.add('hidden');
@@ -546,6 +610,7 @@ class CombaseStudioApp {
     if (this.statTables) this.statTables.textContent = tableCount;
     if (this.statRecords) this.statRecords.textContent = recordCount;
 
+    this.renderDbDropdown();
     this.renderSchemaTree();
     this.renderTables();
   }
