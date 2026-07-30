@@ -1,37 +1,61 @@
 class CombaseStudioApp {
   constructor() {
     this.token = localStorage.getItem('combase_gh_token') || '';
+    this.activeDb = 'default_db';
     this.activeBranch = 'main';
     this.user = null;
-    this.dbState = {
-      version: '1.0.0',
-      branch: 'main',
-      schemas: {
-        users: {
-          name: 'users',
-          columns: [
-            { name: 'id', type: 'INTEGER', primaryKey: true },
-            { name: 'name', type: 'TEXT' },
-            { name: 'email', type: 'TEXT' },
-            { name: 'role', type: 'TEXT' }
+
+    // Multi-Database State Store
+    this.databases = {
+      default_db: {
+        schemas: {
+          users: {
+            name: 'users',
+            columns: [
+              { name: 'id', type: 'INTEGER', primaryKey: true },
+              { name: 'name', type: 'TEXT' },
+              { name: 'email', type: 'TEXT' },
+              { name: 'role', type: 'TEXT' }
+            ],
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString()
+          },
+          products: {
+            name: 'products',
+            columns: [
+              { name: 'id', type: 'INTEGER', primaryKey: true },
+              { name: 'title', type: 'TEXT' },
+              { name: 'price', type: 'REAL' },
+              { name: 'category', type: 'TEXT' }
+            ],
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString()
+          }
+        },
+        tables: {
+          users: [
+            { id: 1, name: 'Adrián', email: 'adrian@terra.org', role: 'Admin' },
+            { id: 2, name: 'Combase Bot', email: 'bot@terra.org', role: 'System Engine' }
           ],
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString()
+          products: [
+            { id: 101, title: 'Terra AI Serverless Runner', price: 0.00, category: 'Compute' },
+            { id: 102, title: 'Rolla Storage Vault 1TB', price: 0.00, category: 'Storage' }
+          ]
         }
-      },
-      tables: {
-        users: [
-          { id: 1, name: 'Adrián', email: 'adrian@terra.org', role: 'Admin' },
-          { id: 2, name: 'Combase Bot', email: 'bot@terra.org', role: 'System Engine' }
-        ]
       }
     };
 
     this.initElements();
     this.attachEventListeners();
     this.checkAuth();
-    this.renderStats();
-    this.renderTables();
+    this.updateDbState();
+  }
+
+  get dbState() {
+    if (!this.databases[this.activeDb]) {
+      this.databases[this.activeDb] = { schemas: {}, tables: {} };
+    }
+    return this.databases[this.activeDb];
   }
 
   initElements() {
@@ -43,22 +67,45 @@ class CombaseStudioApp {
     this.btnDisconnect = document.getElementById('btn-disconnect');
     this.userProfile = document.getElementById('user-profile');
     
-    this.sqlEditor = document.getElementById('sql-editor');
-    this.btnSqlRun = document.getElementById('btn-sql-run');
-    this.btnSqlClear = document.getElementById('btn-sql-clear');
-    this.queryResultsContainer = document.getElementById('query-results-container');
-    this.queryMetaBadge = document.getElementById('query-meta-badge');
-    
+    this.dbSelect = document.getElementById('db-select');
+    this.btnOpenNewDb = document.getElementById('btn-open-new-db');
+    this.modalNewDb = document.getElementById('modal-new-db');
+    this.btnConfirmNewDb = document.getElementById('btn-confirm-new-db');
+    this.inputNewDbName = document.getElementById('input-new-db-name');
+
     this.branchSelect = document.getElementById('branch-select');
-    this.btnNewBranch = document.getElementById('btn-new-branch');
+    this.btnOpenNewBranch = document.getElementById('btn-open-new-branch');
     this.modalNewBranch = document.getElementById('modal-new-branch');
     this.btnConfirmNewBranch = document.getElementById('btn-confirm-new-branch');
     this.inputNewBranchName = document.getElementById('input-new-branch-name');
 
+    this.statActiveDb = document.getElementById('stat-active-db');
     this.statTables = document.getElementById('stat-tables');
     this.statRecords = document.getElementById('stat-records');
-    this.tablesGridContainer = document.getElementById('tables-grid-container');
-    this.timetravelContainer = document.getElementById('timetravel-history-container');
+
+    this.schemaTreeList = document.getElementById('schema-tree-list');
+    this.sqlEditor = document.getElementById('sql-editor');
+    this.snippetDropdown = document.getElementById('snippet-dropdown');
+    this.btnSqlRun = document.getElementById('btn-sql-run');
+    this.btnSqlClear = document.getElementById('btn-sql-clear');
+    this.queryResultsContainer = document.getElementById('query-results-container');
+    this.queryMetaBadge = document.getElementById('query-meta-badge');
+
+    this.tablesCardsGrid = document.getElementById('tables-cards-grid');
+    this.btnOpenCreateTableModal = document.getElementById('btn-open-create-table-modal');
+    this.modalCreateTable = document.getElementById('modal-create-table');
+    this.btnConfirmCreateTable = document.getElementById('btn-confirm-create-table');
+
+    this.modalInspectTable = document.getElementById('modal-inspect-table');
+    this.inspectTableTitle = document.getElementById('inspect-table-title');
+    this.inspectTableSubtitle = document.getElementById('inspect-table-subtitle');
+    this.inspectTableGrid = document.getElementById('inspect-table-grid');
+    this.btnInspectInsertRow = document.getElementById('btn-inspect-insert-row');
+
+    this.modalCodeGen = document.getElementById('modal-code-generator');
+    this.codeGenTitle = document.getElementById('code-gen-title');
+    this.codeGenOutput = document.getElementById('code-gen-output');
+    this.btnCopyGeneratedCode = document.getElementById('btn-copy-generated-code');
 
     if (this.token && this.tokenInput) {
       this.tokenInput.value = this.token;
@@ -79,57 +126,138 @@ class CombaseStudioApp {
     this.btnConnect.addEventListener('click', () => this.connectGitHub());
     this.btnDisconnect.addEventListener('click', () => this.disconnect());
 
-    // SQL Runner
-    this.btnSqlRun.addEventListener('click', () => this.executeSql());
-    this.btnSqlClear.addEventListener('click', () => {
-      this.sqlEditor.value = '';
+    // DB Switcher
+    this.dbSelect.addEventListener('change', (e) => {
+      this.activeDb = e.target.value;
+      this.updateDbState();
+      this.showToast('Database Switched', `Active DB: ${this.activeDb}`, 'info');
     });
 
-    // SQL Snippets
-    document.querySelectorAll('.pill-btn').forEach(btn => {
-      btn.addEventListener('click', () => {
-        this.sqlEditor.value = btn.dataset.sql;
-      });
-    });
-
-    // New Branch Modal
-    this.btnNewBranch.addEventListener('click', () => {
-      this.modalNewBranch.classList.remove('hidden');
-    });
-
-    document.querySelectorAll('.btn-close, .btn-cancel').forEach(btn => {
-      btn.addEventListener('click', () => {
-        this.modalNewBranch.classList.add('hidden');
-      });
-    });
-
-    this.btnConfirmNewBranch.addEventListener('click', () => {
-      const name = this.inputNewBranchName.value.trim();
-      if (name) {
-        const opt = document.createElement('option');
-        opt.value = name;
-        opt.textContent = name;
-        this.branchSelect.appendChild(opt);
-        this.branchSelect.value = name;
-        this.activeBranch = name;
-        this.modalNewBranch.classList.add('hidden');
-        this.showToast('Success', `Created database branch '${name}'`, 'success');
+    this.btnOpenNewDb.addEventListener('click', () => this.modalNewDb.classList.remove('hidden'));
+    this.btnConfirmNewDb.addEventListener('click', () => {
+      const dbName = this.inputNewDbName.value.trim();
+      if (dbName) {
+        if (!this.databases[dbName]) {
+          this.databases[dbName] = { schemas: {}, tables: {} };
+          const opt = document.createElement('option');
+          opt.value = dbName;
+          opt.textContent = dbName;
+          this.dbSelect.appendChild(opt);
+        }
+        this.dbSelect.value = dbName;
+        this.activeDb = dbName;
+        this.inputNewDbName.value = '';
+        this.modalNewDb.classList.add('hidden');
+        this.updateDbState();
+        this.showToast('Success', `Database '${dbName}' created`, 'success');
       }
     });
 
-    // Export SQL
-    const btnExport = document.getElementById('btn-export-sql');
-    if (btnExport) {
-      btnExport.addEventListener('click', () => this.exportSqlDump());
+    // Branch Switcher
+    this.btnOpenNewBranch.addEventListener('click', () => this.modalNewBranch.classList.remove('hidden'));
+    this.btnConfirmNewBranch.addEventListener('click', () => {
+      const branchName = this.inputNewBranchName.value.trim();
+      if (branchName) {
+        const opt = document.createElement('option');
+        opt.value = branchName;
+        opt.textContent = branchName;
+        this.branchSelect.appendChild(opt);
+        this.branchSelect.value = branchName;
+        this.activeBranch = branchName;
+        this.inputNewBranchName.value = '';
+        this.modalNewBranch.classList.add('hidden');
+        this.showToast('Branch Created', `Branch '${branchName}' active`, 'success');
+      }
+    });
+
+    // SQL Snippets Dropdown
+    this.snippetDropdown.addEventListener('change', (e) => {
+      const val = e.target.value;
+      if (val === 'create_users') {
+        this.sqlEditor.value = `CREATE TABLE users (id INTEGER PRIMARY KEY, name TEXT, email TEXT, role TEXT);`;
+      } else if (val === 'insert_user') {
+        this.sqlEditor.value = `INSERT INTO users (name, email, role) VALUES ('Carlos', 'carlos@terra.org', 'Developer');`;
+      } else if (val === 'select_all') {
+        this.sqlEditor.value = `SELECT * FROM users;`;
+      } else if (val === 'select_where') {
+        this.sqlEditor.value = `SELECT * FROM users WHERE role = 'Admin';`;
+      }
+    });
+
+    // SQL Runner
+    this.btnSqlRun.addEventListener('click', () => this.executeSql());
+    this.btnSqlClear.addEventListener('click', () => { this.sqlEditor.value = ''; });
+
+    this.sqlEditor.addEventListener('keydown', (e) => {
+      if (e.ctrlKey && e.key === 'Enter') {
+        e.preventDefault();
+        this.executeSql();
+      }
+    });
+
+    // Table Explorer Actions
+    if (this.btnOpenCreateTableModal) {
+      this.btnOpenCreateTableModal.addEventListener('click', () => this.modalCreateTable.classList.remove('hidden'));
     }
 
-    // Provider Sync Buttons
-    document.querySelectorAll('.btn-sync-provider').forEach(btn => {
+    this.btnConfirmCreateTable.addEventListener('click', () => {
+      const name = document.getElementById('input-table-name').value.trim();
+      const cols = document.getElementById('input-table-cols').value.trim();
+      if (name && cols) {
+        const sql = `CREATE TABLE ${name} (${cols});`;
+        this.sqlEditor.value = sql;
+        this.executeSql();
+        this.modalCreateTable.classList.add('hidden');
+      }
+    });
+
+    // Modal Close buttons
+    document.querySelectorAll('.btn-close, .btn-cancel').forEach(btn => {
+      btn.addEventListener('click', () => this.closeAllModals());
+    });
+
+    // Provider Bridge Generation
+    document.querySelectorAll('.btn-bridge-generate').forEach(btn => {
       btn.addEventListener('click', (e) => {
         const provider = e.currentTarget.dataset.provider;
-        this.showToast('Sync Queued', `Synchronized database state to ${provider.toUpperCase()}`, 'success');
+        this.generateProviderScript(provider);
       });
     });
+
+    this.btnCopyGeneratedCode.addEventListener('click', () => {
+      navigator.clipboard.writeText(this.codeGenOutput.value);
+      this.showToast('Copied', 'Script copied to clipboard', 'success');
+    });
+
+    // SQL Dump Export
+    document.getElementById('btn-export-sql').addEventListener('click', () => this.exportSqlDump());
+
+    // Drag and Drop SQL File Import
+    const dropZone = document.getElementById('drop-zone-sql');
+    const fileInput = document.getElementById('import-sql-file');
+    const btnTriggerImport = document.getElementById('btn-trigger-import-sql');
+
+    if (btnTriggerImport && fileInput) {
+      btnTriggerImport.addEventListener('click', () => fileInput.click());
+      fileInput.addEventListener('change', (e) => {
+        if (e.target.files.length) this.handleSqlFileInput(e.target.files[0]);
+      });
+    }
+
+    if (dropZone) {
+      dropZone.addEventListener('click', () => fileInput.click());
+      dropZone.addEventListener('dragover', (e) => { e.preventDefault(); dropZone.classList.add('drop-zone-active'); });
+      dropZone.addEventListener('dragleave', () => dropZone.classList.remove('drop-zone-active'));
+      dropZone.addEventListener('drop', (e) => {
+        e.preventDefault();
+        dropZone.classList.remove('drop-zone-active');
+        if (e.dataTransfer.files.length) this.handleSqlFileInput(e.dataTransfer.files[0]);
+      });
+    }
+  }
+
+  closeAllModals() {
+    document.querySelectorAll('.modal-backdrop').forEach(m => m.classList.add('hidden'));
   }
 
   switchView(viewId) {
@@ -164,7 +292,6 @@ class CombaseStudioApp {
 
     } catch (err) {
       this.disconnect();
-      this.showToast('Error', 'Invalid or expired GitHub Token.', 'error');
     } finally {
       this.btnConnect.innerHTML = 'Connect';
     }
@@ -194,7 +321,7 @@ class CombaseStudioApp {
       <div class="avatar-placeholder"><i class="fa-regular fa-user"></i></div>
       <div class="user-info">
         <span class="user-name">Guest Mode</span>
-        <span class="user-status text-muted">Not Connected</span>
+        <span class="user-status text-muted">Standalone Local</span>
       </div>
     `;
   }
@@ -210,6 +337,46 @@ class CombaseStudioApp {
         <span class="user-status text-accent"><i class="fa-solid fa-circle" style="font-size:8px;"></i> Connected</span>
       </div>
     `;
+  }
+
+  updateDbState() {
+    if (this.statActiveDb) this.statActiveDb.textContent = this.activeDb;
+    const schemas = Object.values(this.dbState.schemas);
+    const tableCount = schemas.length;
+    let recordCount = 0;
+    Object.values(this.dbState.tables).forEach(t => { recordCount += t.length; });
+
+    if (this.statTables) this.statTables.textContent = tableCount;
+    if (this.statRecords) this.statRecords.textContent = recordCount;
+
+    this.renderSchemaTree();
+    this.renderTables();
+  }
+
+  renderSchemaTree() {
+    if (!this.schemaTreeList) return;
+    this.schemaTreeList.innerHTML = '';
+
+    const schemas = Object.values(this.dbState.schemas);
+    if (schemas.length === 0) {
+      this.schemaTreeList.innerHTML = `<p class="text-small text-muted p-2">No tables found.</p>`;
+      return;
+    }
+
+    schemas.forEach(s => {
+      const rowCount = (this.dbState.tables[s.name] || []).length;
+      const item = document.createElement('div');
+      item.className = 'schema-tree-item';
+      item.innerHTML = `
+        <span><i class="fa-solid fa-table text-teal mr-2"></i> ${s.name}</span>
+        <span class="badge badge-teal font-code">${rowCount}</span>
+      `;
+      item.addEventListener('click', () => {
+        this.sqlEditor.value = `SELECT * FROM ${s.name};`;
+        this.executeSql();
+      });
+      this.schemaTreeList.appendChild(item);
+    });
   }
 
   executeSql() {
@@ -261,16 +428,35 @@ class CombaseStudioApp {
         }
 
       } else if (upper.startsWith('SELECT')) {
-        const match = sql.match(/SELECT\s+([\s\S]+?)\s+FROM\s+([a-zA-Z0-9_-]+)/i);
+        const match = sql.match(/SELECT\s+([\s\S]+?)\s+FROM\s+([a-zA-Z0-9_-]+)(\s+WHERE\s+([\s\S]+?))?/i);
         if (!match) throw new Error('Malformed SELECT statement.');
         const tableName = match[2];
-        const rows = this.dbState.tables[tableName] || [];
+        const whereClause = match[4];
+        let rows = this.dbState.tables[tableName] || [];
+        
+        if (whereClause) {
+          const parts = whereClause.split('=').map(s => s.trim().replace(/^['"]|['"]$/g, ''));
+          if (parts.length === 2) {
+            rows = rows.filter(r => String(r[parts[0]]) === String(parts[1]));
+          }
+        }
+
         this.renderQueryResult(rows, rows.length, Date.now() - startTime);
+
+      } else if (upper.startsWith('DROP TABLE')) {
+        const match = sql.match(/DROP\s+TABLE\s+([a-zA-Z0-9_-]+)/i);
+        if (match) {
+          const tableName = match[1];
+          delete this.dbState.schemas[tableName];
+          delete this.dbState.tables[tableName];
+          this.renderQueryResult([], 0, Date.now() - startTime, 1);
+        }
+
       } else {
         this.renderQueryResult([], 0, Date.now() - startTime, 1);
       }
 
-      this.renderStats();
+      this.updateDbState();
 
     } catch (err) {
       this.queryResultsContainer.innerHTML = `
@@ -317,7 +503,7 @@ class CombaseStudioApp {
     rows.forEach(r => {
       tableHtml += `<tr>`;
       headers.forEach(h => {
-        tableHtml += `<td>${r[h] !== null ? r[h] : '<span class="text-muted">NULL</span>'}</td>`;
+        tableHtml += `<td>${r[h] !== null && r[h] !== undefined ? r[h] : '<span class="text-muted">NULL</span>'}</td>`;
       });
       tableHtml += `</tr>`;
     });
@@ -326,49 +512,95 @@ class CombaseStudioApp {
     this.queryResultsContainer.innerHTML = tableHtml;
   }
 
-  renderStats() {
-    const tableCount = Object.keys(this.dbState.schemas).length;
-    let recordCount = 0;
-    Object.values(this.dbState.tables).forEach(t => { recordCount += t.length; });
-
-    if (this.statTables) this.statTables.textContent = tableCount;
-    if (this.statRecords) this.statRecords.textContent = recordCount;
-  }
-
   renderTables() {
-    if (!this.tablesGridContainer) return;
-    this.tablesGridContainer.innerHTML = '';
+    if (!this.tablesCardsGrid) return;
+    this.tablesCardsGrid.innerHTML = '';
 
     const schemas = Object.values(this.dbState.schemas);
     if (schemas.length === 0) {
-      this.tablesGridContainer.innerHTML = `<p class="text-muted">No tables created yet.</p>`;
+      this.tablesCardsGrid.innerHTML = `<div class="empty-state glass p-5" style="grid-column:1/-1;"><i class="fa-solid fa-table-cells empty-icon"></i><h3>No Tables Created</h3><p class="text-muted">Click "Create Table" to define your first schema.</p></div>`;
       return;
     }
 
     schemas.forEach(s => {
-      const rowCount = (this.dbState.tables[s.name] || []).length;
+      const rows = this.dbState.tables[s.name] || [];
       const card = document.createElement('div');
-      card.className = 'glass p-4 flex flex-column gap-2';
+      card.className = 'table-card glass';
       card.innerHTML = `
-        <div class="flex align-center justify-between">
-          <h4><i class="fa-solid fa-table text-primary mr-2"></i> ${s.name}</h4>
-          <span class="badge badge-primary font-code">${rowCount} rows</span>
+        <div class="table-card-header">
+          <h4><i class="fa-solid fa-table text-teal mr-2"></i> ${s.name}</h4>
+          <span class="badge badge-teal font-code">${rows.length} rows</span>
         </div>
-        <div class="text-small text-muted mt-2">Columns:</div>
+        
+        <div class="text-small text-muted mt-1">Columns:</div>
         <div class="font-code text-small" style="color: #2dd4bf;">
           ${s.columns.map(c => `${c.name} (${c.type})`).join(', ')}
         </div>
+
+        <div class="flex gap-2 mt-3">
+          <button class="btn btn-primary btn-sm flex-1" onclick="app.inspectTable('${s.name}')">
+            <i class="fa-solid fa-eye"></i> Open Table
+          </button>
+          <button class="btn btn-danger-outline btn-sm" onclick="app.dropTable('${s.name}')" title="Drop Table">
+            <i class="fa-solid fa-trash-can"></i>
+          </button>
+        </div>
       `;
-      this.tablesGridContainer.appendChild(card);
+      this.tablesCardsGrid.appendChild(card);
     });
+  }
+
+  inspectTable(tableName) {
+    const schema = this.dbState.schemas[tableName];
+    const rows = this.dbState.tables[tableName] || [];
+    if (!schema) return;
+
+    this.inspectTableTitle.innerHTML = `<i class="fa-solid fa-table text-teal mr-2"></i> Inspecting Table: ${tableName}`;
+    this.inspectTableSubtitle.textContent = `${rows.length} total rows in ${this.activeDb}`;
+    
+    if (rows.length === 0) {
+      this.inspectTableGrid.innerHTML = `<div class="p-4 text-center text-muted">Table '${tableName}' is empty.</div>`;
+    } else {
+      const headers = schema.columns.map(c => c.name);
+      let html = `<table class="data-table"><thead><tr>`;
+      headers.forEach(h => { html += `<th>${h}</th>`; });
+      html += `</tr></thead><tbody>`;
+
+      rows.forEach(r => {
+        html += `<tr>`;
+        headers.forEach(h => {
+          html += `<td>${r[h] !== null && r[h] !== undefined ? r[h] : '<span class="text-muted">NULL</span>'}</td>`;
+        });
+        html += `</tr>`;
+      });
+      html += `</tbody></table>`;
+      this.inspectTableGrid.innerHTML = html;
+    }
+
+    this.btnInspectInsertRow.onclick = () => {
+      const sampleVals = schema.columns.map(c => `'sample_${c.name}'`).join(', ');
+      this.sqlEditor.value = `INSERT INTO ${tableName} VALUES (${sampleVals});`;
+      this.closeAllModals();
+      this.switchView('studio');
+    };
+
+    this.modalInspectTable.classList.remove('hidden');
+  }
+
+  dropTable(tableName) {
+    if (confirm(`Are you sure you want to DROP table '${tableName}'?`)) {
+      this.sqlEditor.value = `DROP TABLE ${tableName};`;
+      this.executeSql();
+      this.showToast('Dropped', `Table '${tableName}' dropped.`, 'success');
+    }
   }
 
   renderTimeTravel() {
     if (!this.timetravelContainer) return;
     this.timetravelContainer.innerHTML = `
-      <div class="glass p-3 mb-2 flex align-center justify-between">
+      <div class="glass p-4 flex align-center justify-between">
         <div>
-          <span class="badge badge-primary font-code mr-2">HEAD</span>
+          <span class="badge badge-teal font-code mr-2">HEAD</span>
           <span class="font-bold">Initial Database Checkpoint</span>
           <span class="text-muted text-small ml-2">• Just now</span>
         </div>
@@ -379,8 +611,49 @@ class CombaseStudioApp {
     `;
   }
 
+  generateProviderScript(provider) {
+    let script = `-- COMBASE Provider Bridge Export for ${provider.toUpperCase()}\n-- Generated At: ${new Date().toISOString()}\n\n`;
+
+    if (provider === 'postgres') {
+      this.codeGenTitle.innerHTML = `<i class="fa-solid fa-database text-teal mr-2"></i> PostgreSQL DDL Migration Script`;
+      Object.values(this.dbState.schemas).forEach(s => {
+        const colDefs = s.columns.map(c => `${c.name} ${c.type === 'INTEGER' ? 'SERIAL' : c.type}${c.primaryKey ? ' PRIMARY KEY' : ''}`).join(', ');
+        script += `CREATE TABLE ${s.name} (${colDefs});\n`;
+      });
+      script += `\n`;
+      Object.entries(this.dbState.tables).forEach(([name, rows]) => {
+        rows.forEach(r => {
+          const keys = Object.keys(r);
+          const vals = keys.map(k => `'${r[k]}'`);
+          script += `INSERT INTO ${name} (${keys.join(', ')}) VALUES (${vals.join(', ')});\n`;
+        });
+      });
+
+    } else if (provider === 'dynamodb') {
+      this.codeGenTitle.innerHTML = `<i class="fa-brands fa-aws text-teal mr-2"></i> DynamoDB JSON Document Payload`;
+      const dynamoData = {};
+      Object.entries(this.dbState.tables).forEach(([name, rows]) => {
+        dynamoData[name] = rows.map(r => {
+          const item = {};
+          Object.keys(r).forEach(k => {
+            item[k] = { S: String(r[k]) };
+          });
+          return { PutRequest: { Item: item } };
+        });
+      });
+      script = JSON.stringify(dynamoData, null, 2);
+
+    } else if (provider === 'rolla') {
+      this.codeGenTitle.innerHTML = `<i class="fa-solid fa-box-archive text-teal mr-2"></i> Rolla-Ball Parquet Snapshot`;
+      script = JSON.stringify(this.dbState, null, 2);
+    }
+
+    this.codeGenOutput.value = script;
+    this.modalCodeGen.classList.remove('hidden');
+  }
+
   exportSqlDump() {
-    let sql = `-- COMBASE SQL Dump\n-- Exported At: ${new Date().toISOString()}\n\n`;
+    let sql = `-- COMBASE SQL Dump\n-- Database: ${this.activeDb}\n-- Exported At: ${new Date().toISOString()}\n\n`;
     Object.values(this.dbState.schemas).forEach(s => {
       const cols = s.columns.map(c => `${c.name} ${c.type}`).join(', ');
       sql += `CREATE TABLE ${s.name} (${cols});\n`;
@@ -398,9 +671,20 @@ class CombaseStudioApp {
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `combase_dump_${Date.now()}.sql`;
+    a.download = `combase_${this.activeDb}_dump_${Date.now()}.sql`;
     a.click();
-    this.showToast('Export', 'Downloaded SQL Dump file', 'success');
+    this.showToast('Export Completed', `Downloaded SQL Dump for '${this.activeDb}'`, 'success');
+  }
+
+  handleSqlFileInput(file) {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const content = e.target.result;
+      this.sqlEditor.value = content;
+      this.switchView('studio');
+      this.showToast('File Loaded', `Loaded '${file.name}' into SQL Editor. Click 'Run Query' to execute.`, 'info');
+    };
+    reader.readAsText(file);
   }
 
   showToast(title, message, type = 'info') {
@@ -411,13 +695,13 @@ class CombaseStudioApp {
     toast.className = `glass p-3 flex align-center gap-3`;
     toast.style.cssText = `
       position: fixed; top: 20px; right: 20px; z-index: 10000; min-width: 280px;
-      border-left: 4px solid ${type === 'success' ? '#10b981' : type === 'error' ? '#ef4444' : '#6366f1'};
+      border-left: 4px solid ${type === 'success' ? '#14b8a6' : type === 'error' ? '#ef4444' : '#015d51'};
       box-shadow: 0 10px 30px rgba(0,0,0,0.5);
     `;
 
     toast.innerHTML = `
       <div>
-        <strong style="display:block; font-size:13px;">${title}</strong>
+        <strong style="display:block; font-size:13px; color: #fff;">${title}</strong>
         <span style="font-size:12px; color: #94a3b8;">${message}</span>
       </div>
     `;
