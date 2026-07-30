@@ -1,0 +1,253 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>COMBASE SQL Studio | Terra Ecosystem</title>
+    <link rel="icon" type="image/png" href="assets/logo_combase.png">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Fira+Code:wght@400;500;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div id="toast-container"></div>
+    
+    <div class="layout">
+        <!-- Sidebar -->
+        <aside class="sidebar">
+            <div class="logo">
+                <img src="assets/logo_combase.png" alt="COMBASE Logo" class="logo-img" />
+                <div class="logo-title-group">
+                    <span class="logo-text">COMBASE</span>
+                    <span class="logo-tag font-code">v1.0.0</span>
+                </div>
+            </div>
+            
+            <nav class="nav-menu">
+                <div class="nav-section">STUDIO</div>
+                <a href="#" class="nav-item active" data-view="studio">
+                    <i class="fa-solid fa-code"></i> SQL Studio
+                </a>
+                <a href="#" class="nav-item" data-view="tables">
+                    <i class="fa-solid fa-table"></i> Table Explorer
+                </a>
+                <a href="#" class="nav-item" data-view="timetravel">
+                    <i class="fa-solid fa-clock-rotate-left"></i> Time-Travel
+                </a>
+                
+                <div class="nav-section mt-4">MULTICLOUD</div>
+                <a href="#" class="nav-item" data-view="bridge">
+                    <i class="fa-solid fa-network-wired"></i> Provider Bridge
+                </a>
+                <a href="#" class="nav-item" data-view="settings">
+                    <i class="fa-solid fa-sliders"></i> Settings & Dump
+                </a>
+            </nav>
+            
+            <div class="sidebar-footer">
+                <div class="user-profile" id="user-profile">
+                    <div class="avatar-placeholder"><i class="fa-regular fa-user"></i></div>
+                    <div class="user-info">
+                        <span class="user-name">Guest Mode</span>
+                        <span class="user-status text-muted">Not Connected</span>
+                    </div>
+                </div>
+            </div>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <!-- Top Bar -->
+            <header class="topbar">
+                <div class="branch-selector-group">
+                    <span class="text-small text-muted mr-2"><i class="fa-solid fa-code-branch"></i> Branch:</span>
+                    <select id="branch-select" class="select-input">
+                        <option value="main">main</option>
+                    </select>
+                    <button class="btn btn-secondary btn-sm" id="btn-new-branch" title="Create new database branch">
+                        <i class="fa-solid fa-plus"></i> New Branch
+                    </button>
+                </div>
+
+                <div class="topbar-actions flex align-center gap-3">
+                    <div class="token-group flex align-center gap-2" id="token-group">
+                        <input type="password" id="gh-token" class="input-text" placeholder="Paste GitHub PAT token..." />
+                        <button class="btn btn-primary btn-sm" id="btn-connect">Connect</button>
+                    </div>
+                    <button class="btn btn-secondary btn-sm hidden" id="btn-disconnect"><i class="fa-solid fa-plug-circle-xmark"></i> Disconnect</button>
+                </div>
+            </header>
+
+            <!-- Stats Bar -->
+            <section class="stats-grid">
+                <div class="stat-card glass">
+                    <div class="stat-icon"><i class="fa-solid fa-database"></i></div>
+                    <div class="stat-details">
+                        <span class="stat-label">Total Tables</span>
+                        <h3 class="stat-value" id="stat-tables">0</h3>
+                    </div>
+                </div>
+                <div class="stat-card glass">
+                    <div class="stat-icon"><i class="fa-solid fa-list-check"></i></div>
+                    <div class="stat-details">
+                        <span class="stat-label">Total Records</span>
+                        <h3 class="stat-value" id="stat-records">0</h3>
+                    </div>
+                </div>
+                <div class="stat-card glass">
+                    <div class="stat-icon"><i class="fa-solid fa-hard-drive"></i></div>
+                    <div class="stat-details">
+                        <span class="stat-label">Database Vault</span>
+                        <h3 class="stat-value" id="stat-vault">.combase-storage</h3>
+                    </div>
+                </div>
+                <div class="stat-card glass">
+                    <div class="stat-icon"><i class="fa-solid fa-shield-halved"></i></div>
+                    <div class="stat-details">
+                        <span class="stat-label">Infrastructure</span>
+                        <h3 class="stat-value text-accent">$0 / Month</h3>
+                    </div>
+                </div>
+            </section>
+
+            <!-- VIEW 1: SQL Studio -->
+            <div class="view-content" id="view-studio">
+                <div class="studio-layout grid-2Col gap-4">
+                    <div class="editor-panel glass flex flex-column">
+                        <div class="panel-header flex align-center justify-between">
+                            <span class="panel-title"><i class="fa-solid fa-terminal mr-2"></i> SQL Editor</span>
+                            <div class="flex gap-2">
+                                <button class="btn btn-secondary btn-sm" id="btn-sql-clear"><i class="fa-solid fa-eraser"></i> Clear</button>
+                                <button class="btn btn-primary btn-sm" id="btn-sql-run"><i class="fa-solid fa-play"></i> Run SQL</button>
+                            </div>
+                        </div>
+
+                        <div class="template-pills flex gap-2">
+                            <span class="pill-label text-small text-muted">Snippets:</span>
+                            <button class="pill-btn" data-sql="CREATE TABLE users (id INTEGER PRIMARY KEY, name TEXT, email TEXT, role TEXT);">+ Create Users</button>
+                            <button class="pill-btn" data-sql="INSERT INTO users (name, email, role) VALUES ('Adrián', 'adrian@terra.org', 'Admin');">+ Insert Row</button>
+                            <button class="pill-btn" data-sql="SELECT * FROM users;">+ Select All</button>
+                        </div>
+
+                        <textarea id="sql-editor" class="code-editor" placeholder="Type SQL query or document query here... (e.g. SELECT * FROM users;)"></textarea>
+                    </div>
+
+                    <div class="results-panel glass flex flex-column">
+                        <div class="panel-header flex align-center justify-between">
+                            <span class="panel-title"><i class="fa-solid fa-table-list mr-2"></i> Query Results</span>
+                            <span id="query-meta-badge" class="badge badge-primary font-code hidden">0 ms</span>
+                        </div>
+                        
+                        <div id="query-results-container" class="results-table-wrapper flex-1">
+                            <div class="empty-state">
+                                <i class="fa-solid fa-code empty-icon"></i>
+                                <h3>No Query Executed</h3>
+                                <p class="text-muted">Run a SQL statement to inspect results in real time.</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- VIEW 2: Table Explorer -->
+            <div class="view-content hidden" id="view-tables">
+                <div class="tables-layout flex flex-column gap-4">
+                    <div class="flex align-center justify-between">
+                        <h2><i class="fa-solid fa-table text-primary mr-2"></i> Table Explorer & ER Schemas</h2>
+                        <button class="btn btn-primary btn-sm" id="btn-open-create-table"><i class="fa-solid fa-plus"></i> Create Table</button>
+                    </div>
+                    <div id="tables-grid-container" class="grid-3Col gap-4"></div>
+                </div>
+            </div>
+
+            <!-- VIEW 3: Time-Travel -->
+            <div class="view-content hidden" id="view-timetravel">
+                <div class="timetravel-layout glass p-5 flex flex-column gap-4">
+                    <h2><i class="fa-solid fa-clock-rotate-left text-primary mr-2"></i> Time-Travel History & Rollback Timeline</h2>
+                    <p class="text-muted">Every mutation in COMBASE creates an immutable checkpoint in Git. Select any past commit SHA to inspect data or restore state.</p>
+                    <div id="timetravel-history-container" class="history-list mt-3"></div>
+                </div>
+            </div>
+
+            <!-- VIEW 4: Provider Bridge -->
+            <div class="view-content hidden" id="view-bridge">
+                <div class="bridge-layout glass p-5 flex flex-column gap-4">
+                    <h2><i class="fa-solid fa-network-wired text-accent mr-2"></i> Provider Bridge (Multi-Cloud Replication)</h2>
+                    <p class="text-muted">COMBASE is 100% independent at $0 cost on GitHub Engine, but allows 1-click replication to traditional database providers.</p>
+                    
+                    <div class="grid-3Col gap-4 mt-4">
+                        <div class="bridge-card glass p-4">
+                            <div class="flex align-center gap-3 mb-3">
+                                <i class="fa-solid fa-database text-primary text-large"></i>
+                                <div>
+                                    <h4>PostgreSQL / Supabase</h4>
+                                    <span class="text-small text-muted">Relational Engine Sync</span>
+                                </div>
+                            </div>
+                            <button class="btn btn-secondary btn-sm w-full btn-sync-provider" data-provider="postgres">Sync to Postgres</button>
+                        </div>
+
+                        <div class="bridge-card glass p-4">
+                            <div class="flex align-center gap-3 mb-3">
+                                <i class="fa-brands fa-aws text-accent text-large"></i>
+                                <div>
+                                    <h4>AWS DynamoDB</h4>
+                                    <span class="text-small text-muted">NoSQL Document Sync</span>
+                                </div>
+                            </div>
+                            <button class="btn btn-secondary btn-sm w-full btn-sync-provider" data-provider="dynamodb">Sync to DynamoDB</button>
+                        </div>
+
+                        <div class="bridge-card glass p-4">
+                            <div class="flex align-center gap-3 mb-3">
+                                <i class="fa-solid fa-cube text-primary text-large"></i>
+                                <div>
+                                    <h4>Rolla Bucket & S3</h4>
+                                    <span class="text-small text-muted">Binary Parquet Checkpoints</span>
+                                </div>
+                            </div>
+                            <button class="btn btn-secondary btn-sm w-full btn-sync-provider" data-provider="rolla">Sync to Rolla/S3</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- VIEW 5: Settings & Dump -->
+            <div class="view-content hidden" id="view-settings">
+                <div class="settings-layout glass p-5 flex flex-column gap-4">
+                    <h2><i class="fa-solid fa-sliders text-primary mr-2"></i> Database Backup & Import / Export</h2>
+                    
+                    <div class="flex gap-4 mt-3">
+                        <button class="btn btn-primary" id="btn-export-sql"><i class="fa-solid fa-download"></i> Export SQL Dump</button>
+                        <button class="btn btn-secondary" id="btn-trigger-import-sql"><i class="fa-solid fa-upload"></i> Import SQL Dump</button>
+                        <input type="file" id="import-sql-file" class="hidden" accept=".sql,.txt" />
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- MODAL: New Branch -->
+    <div id="modal-new-branch" class="modal-backdrop hidden">
+        <div class="modal-card glass">
+            <div class="modal-header">
+                <h3><i class="fa-solid fa-code-branch text-primary mr-2"></i> Create Database Branch</h3>
+                <button class="btn-close">&times;</button>
+            </div>
+            <div class="modal-body p-4">
+                <label class="label-text">Branch Name:</label>
+                <input type="text" id="input-new-branch-name" class="input-text w-full mt-2" placeholder="e.g. staging, feature-tests" />
+            </div>
+            <div class="modal-footer p-4 flex justify-end gap-2">
+                <button class="btn btn-secondary btn-cancel">Cancel</button>
+                <button class="btn btn-primary" id="btn-confirm-new-branch">Create Branch</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Scripts -->
+    <script src="app.js"></script>
+</body>
+</html>
