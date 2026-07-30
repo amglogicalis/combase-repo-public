@@ -6,99 +6,27 @@ class CombaseStudioApp {
     this.user = null;
     this.currentRenameTable = null;
     this.currentInspectTable = null;
-    this.vaultFileSha = null; // Store GitHub file SHA for PUT updates
+    this.vaultFileSha = null;
 
     // Dynamic Time-Travel Commit Checkpoints History
     this.commitHistory = [];
 
-    // Default Fallback Database State
-    this.defaultDatabases = {
+    // Strictly Empty Database State (NO Guest Mode, NO Dummy Data)
+    this.databases = {
       default_db: {
-        schemas: {
-          users: {
-            name: 'users',
-            columns: [
-              { name: 'id', type: 'INTEGER', primaryKey: true },
-              { name: 'name', type: 'TEXT' },
-              { name: 'email', type: 'TEXT' },
-              { name: 'role', type: 'TEXT' }
-            ],
-            createdAt: new Date().toISOString(),
-            updatedAt: new Date().toISOString()
-          },
-          products: {
-            name: 'products',
-            columns: [
-              { name: 'id', type: 'INTEGER', primaryKey: true },
-              { name: 'title', type: 'TEXT' },
-              { name: 'price', type: 'REAL' },
-              { name: 'category', type: 'TEXT' }
-            ],
-            createdAt: new Date().toISOString(),
-            updatedAt: new Date().toISOString()
-          },
-          orders: {
-            name: 'orders',
-            columns: [
-              { name: 'order_id', type: 'INTEGER', primaryKey: true },
-              { name: 'user_id', type: 'INTEGER' },
-              { name: 'total_amount', type: 'REAL' },
-              { name: 'status', type: 'TEXT' }
-            ],
-            createdAt: new Date().toISOString(),
-            updatedAt: new Date().toISOString()
-          },
-          system_logs: {
-            name: 'system_logs',
-            columns: [
-              { name: 'id', type: 'INTEGER', primaryKey: true },
-              { name: 'event', type: 'TEXT' },
-              { name: 'level', type: 'TEXT' },
-              { name: 'timestamp', type: 'DATETIME' }
-            ],
-            createdAt: new Date().toISOString(),
-            updatedAt: new Date().toISOString()
-          }
-        },
-        tables: {
-          users: [
-            { id: 1, name: 'Adrián', email: 'adrian@terra.org', role: 'Admin' },
-            { id: 2, name: 'Combase Bot', email: 'bot@terra.org', role: 'System Engine' },
-            { id: 3, name: 'Elena García', email: 'elena@terra.org', role: 'Developer' }
-          ],
-          products: [
-            { id: 101, title: 'Terra AI Serverless Runner', price: 0.00, category: 'Compute' },
-            { id: 102, title: 'Rolla Storage Vault 1TB', price: 0.00, category: 'Storage' },
-            { id: 103, title: 'Webbl CDN Global Edge', price: 0.00, category: 'Hosting' }
-          ],
-          orders: [
-            { order_id: 5001, user_id: 1, total_amount: 0.00, status: 'COMPLETED' },
-            { order_id: 5002, user_id: 3, total_amount: 0.00, status: 'PROCESSING' }
-          ],
-          system_logs: [
-            { id: 1, event: 'COMBASE Initialized', level: 'INFO', timestamp: new Date().toISOString() },
-            { id: 2, event: 'Zero-Copy Checkpoint Created', level: 'INFO', timestamp: new Date().toISOString() }
-          ]
-        }
+        schemas: {},
+        tables: {}
       }
     };
 
-    // Load persisted local state if present, else fallback
-    const savedLocal = localStorage.getItem('combase_db_store');
-    if (savedLocal) {
-      try {
-        this.databases = JSON.parse(savedLocal);
-      } catch (e) {
-        this.databases = JSON.parse(JSON.stringify(this.defaultDatabases));
-      }
-    } else {
-      this.databases = JSON.parse(JSON.stringify(this.defaultDatabases));
-    }
-
     this.initElements();
     this.attachEventListeners();
-    this.checkAuth();
-    this.updateDbState();
+
+    if (this.token) {
+      this.checkAuth();
+    } else {
+      this.showLockScreen();
+    }
   }
 
   get dbState() {
@@ -108,31 +36,55 @@ class CombaseStudioApp {
     return this.databases[this.activeDb];
   }
 
-  async persistCurrentState(commitMsg = 'Database update') {
-    // 1. Always persist to localStorage so browser reload NEVER loses data
-    localStorage.setItem('combase_db_store', JSON.stringify(this.databases));
+  showLockScreen() {
+    this.token = null;
+    this.user = null;
+    this.vaultFileSha = null;
+    localStorage.removeItem('combase_gh_token');
 
-    // 2. If GitHub token is authenticated, sync with remote .combase-storage repo
-    if (this.token && this.user) {
-      await this.pushToGitHubVault(commitMsg);
-    } else {
-      // Local checkpoint
-      this.recordLocalCheckpoint(commitMsg);
-    }
+    // Wipe memory
+    this.databases = { default_db: { schemas: {}, tables: {} } };
+    this.commitHistory = [];
+
+    document.getElementById('view-auth-required').classList.remove('hidden');
+    document.getElementById('authenticated-content').classList.add('hidden');
+    document.getElementById('token-group').classList.remove('hidden');
+    document.getElementById('btn-disconnect').classList.add('hidden');
+
+    this.navItems.forEach(item => item.classList.add('disabled'));
+
+    this.userProfile.innerHTML = `
+      <div class="avatar-placeholder"><i class="fa-solid fa-lock text-danger"></i></div>
+      <div class="user-info">
+        <span class="user-name">Locked Console</span>
+        <span class="user-status text-danger"><i class="fa-solid fa-circle" style="font-size:8px;"></i> Access Restricted</span>
+      </div>
+    `;
+
+    this.updateDbState();
   }
 
-  recordLocalCheckpoint(message) {
-    const sha = Math.random().toString(16).substring(2, 9);
-    const snapshot = JSON.parse(JSON.stringify(this.databases));
-    const newCommit = {
-      sha,
-      message,
-      timestamp: new Date().toISOString(),
-      snapshot
-    };
+  showAuthenticatedScreen() {
+    document.getElementById('view-auth-required').classList.add('hidden');
+    document.getElementById('authenticated-content').classList.remove('hidden');
+    document.getElementById('token-group').classList.add('hidden');
+    document.getElementById('btn-disconnect').classList.remove('hidden');
 
-    this.commitHistory.unshift(newCommit);
-    this.renderTimeTravel();
+    this.navItems.forEach(item => item.classList.remove('disabled'));
+
+    this.userProfile.innerHTML = `
+      <img src="${this.user.avatar_url}" class="avatar-placeholder" alt="${this.user.login}">
+      <div class="user-info">
+        <span class="user-name">${this.user.login}</span>
+        <span class="user-status text-accent"><i class="fa-solid fa-circle" style="font-size:8px;"></i> Connected</span>
+      </div>
+    `;
+  }
+
+  async persistCurrentState(commitMsg = 'Database update') {
+    if (this.token && this.user) {
+      await this.pushToGitHubVault(commitMsg);
+    }
   }
 
   async pushToGitHubVault(commitMsg) {
@@ -230,7 +182,6 @@ class CombaseStudioApp {
         const remoteData = JSON.parse(decodedStr);
 
         this.databases = remoteData;
-        localStorage.setItem('combase_db_store', JSON.stringify(this.databases));
         this.updateDbState();
         this.showToast('Vault Loaded', 'Database loaded from GitHub .combase-storage!', 'success');
       }
@@ -264,6 +215,9 @@ class CombaseStudioApp {
     this.btnDisconnect = document.getElementById('btn-disconnect');
     this.userProfile = document.getElementById('user-profile');
     
+    this.authGateToken = document.getElementById('auth-gate-token');
+    this.btnAuthGateConnect = document.getElementById('btn-auth-gate-connect');
+
     this.dbSelect = document.getElementById('db-select');
     this.btnOpenNewDb = document.getElementById('btn-open-new-db');
     this.modalNewDb = document.getElementById('modal-new-db');
@@ -336,6 +290,7 @@ class CombaseStudioApp {
     this.navItems.forEach(item => {
       item.addEventListener('click', (e) => {
         e.preventDefault();
+        if (item.classList.contains('disabled')) return;
         const viewId = item.dataset.view;
         if (viewId) this.switchView(viewId);
       });
@@ -344,6 +299,18 @@ class CombaseStudioApp {
     // Auth
     this.btnConnect.addEventListener('click', () => this.connectGitHub());
     this.btnDisconnect.addEventListener('click', () => this.disconnect());
+
+    if (this.btnAuthGateConnect) {
+      this.btnAuthGateConnect.addEventListener('click', () => {
+        const val = this.authGateToken.value.trim();
+        if (val) {
+          this.tokenInput.value = val;
+          this.connectGitHub();
+        } else {
+          this.showToast('Error', 'Please enter a GitHub PAT token.', 'error');
+        }
+      });
+    }
 
     // DB Switcher
     this.dbSelect.addEventListener('change', (e) => {
@@ -538,69 +505,35 @@ class CombaseStudioApp {
       });
 
       if (!res.ok) {
-        if (res.status === 401) {
-          throw new Error('Invalid Token');
-        }
+        throw new Error('Invalid Token');
       }
 
       this.user = await res.json();
-      this.setAuthenticatedState();
+      localStorage.setItem('combase_gh_token', this.token);
+      this.showAuthenticatedScreen();
       await this.loadFromGitHubVault();
 
     } catch (err) {
-      if (err.message === 'Invalid Token') {
-        this.disconnect();
-        this.showToast('Error', 'Invalid or expired GitHub PAT.', 'error');
-      }
+      this.showLockScreen();
+      this.showToast('Authentication Failed', 'Invalid or expired GitHub PAT Token.', 'error');
     } finally {
-      this.btnConnect.innerHTML = 'Connect';
+      this.btnConnect.innerHTML = 'Connect & Unlock';
     }
   }
 
   connectGitHub() {
-    const val = this.tokenInput.value.trim();
+    const val = this.tokenInput.value.trim() || (this.authGateToken ? this.authGateToken.value.trim() : '');
     if (!val) {
       this.showToast('Error', 'Please enter a GitHub Personal Access Token.', 'error');
       return;
     }
     this.token = val;
-    localStorage.setItem('combase_gh_token', this.token);
     this.checkAuth();
   }
 
   disconnect() {
-    this.token = '';
-    this.user = null;
-    this.vaultFileSha = null;
-    localStorage.removeItem('combase_gh_token');
-    
-    document.getElementById('token-group').classList.remove('hidden');
-    this.btnDisconnect.classList.add('hidden');
-    this.tokenInput.value = '';
-
-    this.userProfile.innerHTML = `
-      <div class="avatar-placeholder"><i class="fa-regular fa-user"></i></div>
-      <div class="user-info">
-        <span class="user-name">Guest Mode</span>
-        <span class="user-status text-muted">Standalone Local</span>
-      </div>
-    `;
-
-    this.showToast('Disconnected', 'Switched to Guest Standalone Mode.', 'info');
-  }
-
-  setAuthenticatedState() {
-    document.getElementById('token-group').classList.add('hidden');
-    this.btnDisconnect.classList.remove('hidden');
-    if (this.tokenInput) this.tokenInput.value = this.token;
-    
-    this.userProfile.innerHTML = `
-      <img src="${this.user.avatar_url}" class="avatar-placeholder" alt="${this.user.login}">
-      <div class="user-info">
-        <span class="user-name">${this.user.login}</span>
-        <span class="user-status text-accent"><i class="fa-solid fa-circle" style="font-size:8px;"></i> Connected</span>
-      </div>
-    `;
+    this.showLockScreen();
+    this.showToast('Console Locked', 'Session terminated. Access restricted.', 'info');
   }
 
   updateDbState() {
@@ -800,7 +733,7 @@ class CombaseStudioApp {
 
     const schemas = Object.values(this.dbState.schemas);
     if (schemas.length === 0) {
-      this.tablesCardsGrid.innerHTML = `<div class="empty-state glass p-5" style="grid-column:1/-1;"><i class="fa-solid fa-table-cells empty-icon"></i><h3>No Tables Created</h3><p class="text-muted">Click "Create Table" to define your first schema.</p></div>`;
+      this.tablesCardsGrid.innerHTML = `<div class="empty-state glass p-5" style="grid-column:1/-1;"><i class="fa-solid fa-table-cells empty-icon"></i><h3>No Tables Found</h3><p class="text-muted">Click "Create Table" to define your first schema.</p></div>`;
       return;
     }
 
