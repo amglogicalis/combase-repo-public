@@ -360,6 +360,26 @@ body {
   font-weight: 600;
 }
 
+.cell-editable {
+  cursor: pointer;
+  transition: background 0.2s ease;
+}
+
+.cell-editable:hover {
+  background: var(--primary-glow);
+}
+
+.cell-input {
+  background: #000;
+  border: 1px solid #2dd4bf;
+  color: #2dd4bf;
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-family: inherit;
+  font-size: 13px;
+  width: 100%;
+}
+
 /* Cards & Grid (Spacious Bubble Cards) */
 .grid-3Col {
   display: grid;

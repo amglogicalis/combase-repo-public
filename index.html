@@ -173,7 +173,7 @@
                     <div class="flex align-center justify-between">
                         <div>
                             <h2><i class="fa-solid fa-table-cells text-teal mr-2"></i> Table Explorer & Data Inspector</h2>
-                            <p class="text-muted text-small mt-1">Select any table to inspect rows, rename, modify columns, insert data or delete tables.</p>
+                            <p class="text-muted text-small mt-1">Select any table to inspect rows, edit cells, manage columns, rename or drop tables.</p>
                         </div>
                         <button class="btn btn-primary btn-sm" id="btn-open-create-table-modal"><i class="fa-solid fa-plus"></i> Create Table</button>
                     </div>
@@ -242,6 +242,22 @@
                                 <button class="btn btn-secondary btn-sm w-full btn-bridge-generate" data-provider="rolla"><i class="fa-solid fa-box-archive"></i> Archive to Rolla/S3</button>
                             </div>
                         </div>
+                    </div>
+
+                    <!-- Bi-Directional Migration Section (External Provider -> COMBASE) -->
+                    <div class="glass p-5 mt-4 flex flex-column gap-3">
+                        <h3><i class="fa-solid fa-right-to-bracket text-teal mr-2"></i> Import FROM External Providers to COMBASE</h3>
+                        <p class="text-muted text-small">Paste external DDL/JSON payloads (PostgreSQL DDL, Supabase SQL, DynamoDB JSON) to automatically convert and import into COMBASE.</p>
+                        
+                        <div class="flex gap-3 align-center mt-2">
+                            <select id="import-provider-type" class="select-input">
+                                <option value="postgres">PostgreSQL / Supabase DDL Script</option>
+                                <option value="dynamodb">AWS DynamoDB JSON Payload</option>
+                                <option value="sqlite">SQLite DDL Dump</option>
+                            </select>
+                            <button class="btn btn-primary btn-sm" id="btn-import-provider-data"><i class="fa-solid fa-file-import"></i> Convert & Import to COMBASE</button>
+                        </div>
+                        <textarea id="import-provider-textarea" class="code-editor mt-2" style="height: 140px;" placeholder="Paste PostgreSQL DDL/INSERT statements or DynamoDB JSON items here..."></textarea>
                     </div>
                 </div>
             </div>
@@ -352,17 +368,43 @@
         </div>
     </div>
 
+    <!-- MODAL: Manage Columns & Schema -->
+    <div id="modal-manage-columns" class="modal-backdrop hidden">
+        <div class="modal-card glass" style="width: 580px;">
+            <div class="modal-header">
+                <h3><i class="fa-solid fa-sliders text-teal mr-2"></i> Manage Schema & Columns</h3>
+                <button class="btn-close">&times;</button>
+            </div>
+            <div class="modal-body p-4 flex flex-column gap-3">
+                <div class="flex align-center justify-between">
+                    <span class="text-small text-muted font-bold">Existing Columns</span>
+                    <button class="btn btn-secondary btn-xs" id="btn-modal-add-col"><i class="fa-solid fa-plus"></i> Add Column</button>
+                </div>
+                <div id="modal-columns-list" class="flex flex-column gap-2 max-h-60 overflow-y-auto">
+                    <!-- Dynamic column rows -->
+                </div>
+            </div>
+            <div class="modal-footer p-4 flex justify-end gap-2">
+                <button class="btn btn-secondary btn-cancel">Cancel</button>
+                <button class="btn btn-primary" id="btn-confirm-save-schema">Save Schema Changes</button>
+            </div>
+        </div>
+    </div>
+
     <!-- MODAL: Table Data Inspector -->
     <div id="modal-inspect-table" class="modal-backdrop hidden">
-        <div class="modal-card glass" style="width: 840px; max-width: 95vw;">
+        <div class="modal-card glass" style="width: 860px; max-width: 95vw;">
             <div class="modal-header">
                 <h3 id="inspect-table-title"><i class="fa-solid fa-table text-teal mr-2"></i> Table Inspector</h3>
                 <button class="btn-close">&times;</button>
             </div>
             <div class="modal-body p-4 flex flex-column gap-3">
                 <div class="flex align-center justify-between">
-                    <span id="inspect-table-subtitle" class="text-small text-muted">Showing rows</span>
-                    <button class="btn btn-primary btn-sm" id="btn-inspect-insert-row"><i class="fa-solid fa-plus"></i> Insert Row</button>
+                    <span id="inspect-table-subtitle" class="text-small text-muted">Double-click any cell to edit directly. Click "+ Add Row" for visual entry.</span>
+                    <div class="flex gap-2">
+                        <button class="btn btn-secondary btn-sm" id="btn-inspect-manage-schema"><i class="fa-solid fa-sliders"></i> Edit Schema</button>
+                        <button class="btn btn-primary btn-sm" id="btn-inspect-add-inline-row"><i class="fa-solid fa-plus"></i> Add Row</button>
+                    </div>
                 </div>
                 <div id="inspect-table-grid" class="results-table-wrapper" style="max-height: 400px; overflow-y: auto;">
                     <!-- Data table rendered dynamically -->

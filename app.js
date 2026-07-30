@@ -5,6 +5,7 @@ class CombaseStudioApp {
     this.activeBranch = 'main';
     this.user = null;
     this.currentRenameTable = null;
+    this.currentInspectTable = null;
 
     // Multi-Database State Store (Pre-populated demo tables)
     this.databases = {
@@ -137,7 +138,13 @@ class CombaseStudioApp {
     this.inspectTableTitle = document.getElementById('inspect-table-title');
     this.inspectTableSubtitle = document.getElementById('inspect-table-subtitle');
     this.inspectTableGrid = document.getElementById('inspect-table-grid');
-    this.btnInspectInsertRow = document.getElementById('btn-inspect-insert-row');
+    this.btnInspectAddInlineRow = document.getElementById('btn-inspect-add-inline-row');
+    this.btnInspectManageSchema = document.getElementById('btn-inspect-manage-schema');
+
+    this.modalManageColumns = document.getElementById('modal-manage-columns');
+    this.modalColumnsList = document.getElementById('modal-columns-list');
+    this.btnModalAddCol = document.getElementById('btn-modal-add-col');
+    this.btnConfirmSaveSchema = document.getElementById('btn-confirm-save-schema');
 
     this.modalCustomConfirm = document.getElementById('modal-custom-confirm');
     this.confirmModalTitle = document.getElementById('confirm-modal-title');
@@ -149,6 +156,10 @@ class CombaseStudioApp {
     this.codeGenTitle = document.getElementById('code-gen-title');
     this.codeGenOutput = document.getElementById('code-gen-output');
     this.btnCopyGeneratedCode = document.getElementById('btn-copy-generated-code');
+
+    this.btnImportProviderData = document.getElementById('btn-import-provider-data');
+    this.importProviderType = document.getElementById('import-provider-type');
+    this.importProviderTextarea = document.getElementById('import-provider-textarea');
 
     if (this.token && this.tokenInput) {
       this.tokenInput.value = this.token;
@@ -250,6 +261,26 @@ class CombaseStudioApp {
         this.showToast('Renamed', `Table renamed to '${newName}'`, 'success');
       }
     });
+
+    // Visual Schema Manager
+    if (this.btnInspectManageSchema) {
+      this.btnInspectManageSchema.addEventListener('click', () => {
+        if (this.currentInspectTable) this.openManageSchemaModal(this.currentInspectTable);
+      });
+    }
+
+    if (this.btnModalAddCol) {
+      this.btnModalAddCol.addEventListener('click', () => this.appendColumnRow('', 'TEXT'));
+    }
+
+    if (this.btnConfirmSaveSchema) {
+      this.btnConfirmSaveSchema.addEventListener('click', () => this.saveSchemaChanges());
+    }
+
+    // Bi-directional Provider Import
+    if (this.btnImportProviderData) {
+      this.btnImportProviderData.addEventListener('click', () => this.importExternalProviderData());
+    }
 
     // Modal Close buttons
     document.querySelectorAll('.btn-close, .btn-cancel').forEach(btn => {
@@ -615,7 +646,7 @@ class CombaseStudioApp {
             <i class="fa-solid fa-eye"></i> Open Table
           </button>
           <button class="btn btn-secondary btn-sm" onclick="app.openRenameModal('${s.name}')" title="Rename Table">
-            <i class="fa-solid fa-pen"></i> Rename
+            <i class="fa-solid fa-pen"></i>
           </button>
           <button class="btn btn-danger-outline btn-sm" onclick="app.dropTable('${s.name}')" title="Drop Table">
             <i class="fa-solid fa-trash-can"></i>
@@ -634,41 +665,128 @@ class CombaseStudioApp {
   }
 
   inspectTable(tableName) {
+    this.currentInspectTable = tableName;
     const schema = this.dbState.schemas[tableName];
     const rows = this.dbState.tables[tableName] || [];
     if (!schema) return;
 
     this.inspectTableTitle.innerHTML = `<i class="fa-solid fa-table text-teal mr-2"></i> Inspecting Table: ${tableName}`;
-    this.inspectTableSubtitle.textContent = `${rows.length} total rows in ${this.activeDb}`;
+    this.inspectTableSubtitle.textContent = `${rows.length} total rows • Double-click any cell to edit directly.`;
     
-    if (rows.length === 0) {
-      this.inspectTableGrid.innerHTML = `<div class="p-4 text-center text-muted">Table '${tableName}' is empty.</div>`;
-    } else {
-      const headers = schema.columns.map(c => c.name);
-      let html = `<table class="data-table"><thead><tr>`;
-      headers.forEach(h => { html += `<th>${h}</th>`; });
-      html += `<th style="text-align:right;">Actions</th></tr></thead><tbody>`;
+    const headers = schema.columns.map(c => c.name);
+    let html = `<table class="data-table"><thead><tr>`;
+    headers.forEach(h => { html += `<th>${h}</th>`; });
+    html += `<th style="text-align:right;">Actions</th></tr></thead><tbody>`;
 
-      rows.forEach((r, idx) => {
-        html += `<tr>`;
-        headers.forEach(h => {
-          html += `<td>${r[h] !== null && r[h] !== undefined ? r[h] : '<span class="text-muted">NULL</span>'}</td>`;
-        });
-        html += `<td style="text-align:right;"><button class="btn btn-danger-outline btn-xs" onclick="app.deleteRow('${tableName}', ${idx})"><i class="fa-solid fa-trash"></i></button></td>`;
-        html += `</tr>`;
+    rows.forEach((r, rowIdx) => {
+      html += `<tr>`;
+      headers.forEach(h => {
+        const val = r[h] !== null && r[h] !== undefined ? r[h] : '';
+        html += `<td class="cell-editable" ondblclick="app.makeCellEditable(this, '${tableName}', ${rowIdx}, '${h}')">${val !== '' ? val : '<span class="text-muted">NULL</span>'}</td>`;
       });
-      html += `</tbody></table>`;
-      this.inspectTableGrid.innerHTML = html;
-    }
+      html += `<td style="text-align:right;"><button class="btn btn-danger-outline btn-xs" onclick="app.deleteRow('${tableName}', ${rowIdx})"><i class="fa-solid fa-trash"></i></button></td>`;
+      html += `</tr>`;
+    });
 
-    this.btnInspectInsertRow.onclick = () => {
-      const sampleVals = schema.columns.map(c => `'sample_${c.name}'`).join(', ');
-      this.sqlEditor.value = `INSERT INTO ${tableName} VALUES (${sampleVals});`;
-      this.closeAllModals();
-      this.switchView('studio');
+    html += `</tbody></table>`;
+    this.inspectTableGrid.innerHTML = html;
+
+    // Attach inline "+ Add Row" listener
+    this.btnInspectAddInlineRow.onclick = () => this.addInlineEmptyRow(tableName);
+    this.modalInspectTable.classList.remove('hidden');
+  }
+
+  addInlineEmptyRow(tableName) {
+    const schema = this.dbState.schemas[tableName];
+    if (!schema) return;
+
+    const newRow = {};
+    schema.columns.forEach((c, idx) => {
+      newRow[c.name] = c.primaryKey ? (this.dbState.tables[tableName].length + 1) : `new_${c.name}`;
+    });
+
+    this.dbState.tables[tableName].push(newRow);
+    this.updateDbState();
+    this.inspectTable(tableName);
+    this.showToast('Row Created', `Visual row added to ${tableName}`, 'success');
+  }
+
+  makeCellEditable(tdElement, tableName, rowIdx, colName) {
+    const currentValue = this.dbState.tables[tableName][rowIdx][colName] ?? '';
+    tdElement.innerHTML = `<input type="text" class="cell-input" value="${currentValue}" />`;
+    const input = tdElement.querySelector('input');
+    input.focus();
+
+    const saveCell = () => {
+      const newVal = input.value;
+      this.dbState.tables[tableName][rowIdx][colName] = newVal;
+      this.updateDbState();
+      tdElement.innerHTML = newVal !== '' ? newVal : '<span class="text-muted">NULL</span>';
+      this.showToast('Updated', `Cell updated to "${newVal}"`, 'success');
     };
 
-    this.modalInspectTable.classList.remove('hidden');
+    input.onblur = saveCell;
+    input.onkeydown = (e) => {
+      if (e.key === 'Enter') {
+        saveCell();
+      }
+    };
+  }
+
+  openManageSchemaModal(tableName) {
+    const schema = this.dbState.schemas[tableName];
+    if (!schema) return;
+    this.modalColumnsList.innerHTML = '';
+
+    schema.columns.forEach((c, idx) => {
+      this.appendColumnRow(c.name, c.type, c.primaryKey);
+    });
+
+    this.modalManageColumns.classList.remove('hidden');
+  }
+
+  appendColumnRow(name = '', type = 'TEXT', isPk = false) {
+    const row = document.createElement('div');
+    row.className = 'flex gap-2 align-center column-manage-row';
+    row.innerHTML = `
+      <input type="text" class="input-text flex-1 col-name-input" value="${name}" placeholder="Column Name" />
+      <select class="select-input col-type-select">
+        <option value="TEXT" ${type === 'TEXT' ? 'selected' : ''}>TEXT</option>
+        <option value="INTEGER" ${type === 'INTEGER' ? 'selected' : ''}>INTEGER</option>
+        <option value="REAL" ${type === 'REAL' ? 'selected' : ''}>REAL</option>
+        <option value="BOOLEAN" ${type === 'BOOLEAN' ? 'selected' : ''}>BOOLEAN</option>
+        <option value="JSON" ${type === 'JSON' ? 'selected' : ''}>JSON</option>
+        <option value="DATETIME" ${type === 'DATETIME' ? 'selected' : ''}>DATETIME</option>
+      </select>
+      <button class="btn btn-danger-outline btn-xs" onclick="this.parentElement.remove()"><i class="fa-solid fa-trash"></i></button>
+    `;
+    this.modalColumnsList.appendChild(row);
+  }
+
+  saveSchemaChanges() {
+    if (!this.currentInspectTable) return;
+    const tableName = this.currentInspectTable;
+    const columnRows = this.modalColumnsList.querySelectorAll('.column-manage-row');
+    
+    const newCols = [];
+    columnRows.forEach((r, idx) => {
+      const name = r.querySelector('.col-name-input').value.trim();
+      const type = r.querySelector('.col-type-select').value;
+      if (name) {
+        newCols.push({ name, type, primaryKey: idx === 0 });
+      }
+    });
+
+    if (newCols.length === 0) {
+      this.showToast('Error', 'Table must have at least 1 column.', 'error');
+      return;
+    }
+
+    this.dbState.schemas[tableName].columns = newCols;
+    this.modalManageColumns.classList.add('hidden');
+    this.updateDbState();
+    this.inspectTable(tableName);
+    this.showToast('Schema Updated', `Updated schema for '${tableName}' visually!`, 'success');
   }
 
   deleteRow(tableName, rowIndex) {
@@ -690,6 +808,46 @@ class CombaseStudioApp {
         this.showToast('Dropped', `Table '${tableName}' dropped.`, 'success');
       }
     );
+  }
+
+  importExternalProviderData() {
+    const rawData = this.importProviderTextarea.value.trim();
+    if (!rawData) {
+      this.showToast('Error', 'Please paste PostgreSQL DDL or DynamoDB JSON payload.', 'error');
+      return;
+    }
+
+    try {
+      if (rawData.startsWith('{') || rawData.startsWith('[')) {
+        // DynamoDB JSON
+        const parsed = JSON.parse(rawData);
+        Object.entries(parsed).forEach(([tbl, items]) => {
+          this.dbState.schemas[tbl] = {
+            name: tbl,
+            columns: [{ name: 'id', type: 'TEXT', primaryKey: true }, { name: 'payload', type: 'JSON' }],
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString()
+          };
+          this.dbState.tables[tbl] = items.map((it, idx) => ({ id: idx + 1, payload: JSON.stringify(it) }));
+        });
+
+      } else {
+        // SQL DDL / Insert
+        this.sqlEditor.value = rawData;
+        const statements = rawData.split(';').map(s => s.trim()).filter(Boolean);
+        statements.forEach(st => {
+          this.sqlEditor.value = st;
+          this.executeSql();
+        });
+      }
+
+      this.importProviderTextarea.value = '';
+      this.updateDbState();
+      this.showToast('Import Complete', 'External provider data imported into COMBASE!', 'success');
+
+    } catch (err) {
+      this.showToast('Import Error', err.message, 'error');
+    }
   }
 
   renderTimeTravel() {
