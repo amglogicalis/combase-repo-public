@@ -6,19 +6,13 @@ class CombaseStudioApp {
     this.user = null;
     this.currentRenameTable = null;
     this.currentInspectTable = null;
+    this.vaultFileSha = null; // Store GitHub file SHA for PUT updates
 
     // Dynamic Time-Travel Commit Checkpoints History
-    this.commitHistory = [
-      {
-        sha: 'b14c9ef',
-        message: 'Initial Database Initialization',
-        timestamp: new Date().toISOString(),
-        snapshot: null
-      }
-    ];
+    this.commitHistory = [];
 
-    // Multi-Database State Store (Pre-populated demo tables)
-    this.databases = {
+    // Default Fallback Database State
+    this.defaultDatabases = {
       default_db: {
         schemas: {
           users: {
@@ -89,8 +83,17 @@ class CombaseStudioApp {
       }
     };
 
-    // Save initial snapshot
-    this.commitHistory[0].snapshot = JSON.parse(JSON.stringify(this.databases));
+    // Load persisted local state if present, else fallback
+    const savedLocal = localStorage.getItem('combase_db_store');
+    if (savedLocal) {
+      try {
+        this.databases = JSON.parse(savedLocal);
+      } catch (e) {
+        this.databases = JSON.parse(JSON.stringify(this.defaultDatabases));
+      }
+    } else {
+      this.databases = JSON.parse(JSON.stringify(this.defaultDatabases));
+    }
 
     this.initElements();
     this.attachEventListeners();
@@ -105,7 +108,20 @@ class CombaseStudioApp {
     return this.databases[this.activeDb];
   }
 
-  recordGitCheckpoint(message) {
+  async persistCurrentState(commitMsg = 'Database update') {
+    // 1. Always persist to localStorage so browser reload NEVER loses data
+    localStorage.setItem('combase_db_store', JSON.stringify(this.databases));
+
+    // 2. If GitHub token is authenticated, sync with remote .combase-storage repo
+    if (this.token && this.user) {
+      await this.pushToGitHubVault(commitMsg);
+    } else {
+      // Local checkpoint
+      this.recordLocalCheckpoint(commitMsg);
+    }
+  }
+
+  recordLocalCheckpoint(message) {
     const sha = Math.random().toString(16).substring(2, 9);
     const snapshot = JSON.parse(JSON.stringify(this.databases));
     const newCommit = {
@@ -117,6 +133,126 @@ class CombaseStudioApp {
 
     this.commitHistory.unshift(newCommit);
     this.renderTimeTravel();
+  }
+
+  async pushToGitHubVault(commitMsg) {
+    try {
+      const owner = this.user.login;
+      const repo = '.combase-storage';
+      const path = 'db.json';
+
+      // Convert content to utf-8 base64
+      const jsonStr = JSON.stringify(this.databases, null, 2);
+      const contentBase64 = btoa(unescape(encodeURIComponent(jsonStr)));
+
+      // Get current file SHA if not cached
+      if (!this.vaultFileSha) {
+        const getRes = await fetch(`https://api.github.com/repos/${owner}/${repo}/contents/${path}?ref=${this.activeBranch}`, {
+          headers: { 'Authorization': `token ${this.token}` }
+        });
+        if (getRes.ok) {
+          const fileData = await getRes.json();
+          this.vaultFileSha = fileData.sha;
+        }
+      }
+
+      const body = {
+        message: `combase: ${commitMsg}`,
+        content: contentBase64,
+        branch: this.activeBranch
+      };
+      if (this.vaultFileSha) body.sha = this.vaultFileSha;
+
+      const putRes = await fetch(`https://api.github.com/repos/${owner}/${repo}/contents/${path}`, {
+        method: 'PUT',
+        headers: {
+          'Authorization': `token ${this.token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(body)
+      });
+
+      if (putRes.ok) {
+        const resData = await putRes.json();
+        this.vaultFileSha = resData.content.sha;
+        const commitSha = resData.commit.sha.substring(0, 7);
+
+        this.commitHistory.unshift({
+          sha: commitSha,
+          message: commitMsg,
+          timestamp: new Date().toISOString(),
+          snapshot: JSON.parse(JSON.stringify(this.databases))
+        });
+        this.renderTimeTravel();
+        this.showToast('Git Vault Synced', `Committed to .combase-storage (${commitSha})`, 'success');
+      }
+    } catch (err) {
+      console.warn('GitHub Vault sync warning:', err);
+    }
+  }
+
+  async loadFromGitHubVault() {
+    if (!this.token || !this.user) return;
+
+    try {
+      const owner = this.user.login;
+      const repo = '.combase-storage';
+      const path = 'db.json';
+
+      // 1. Check if repo exists; if 404 create it
+      const repoCheck = await fetch(`https://api.github.com/repos/${owner}/${repo}`, {
+        headers: { 'Authorization': `token ${this.token}` }
+      });
+
+      if (repoCheck.status === 404) {
+        // Create private repo
+        await fetch('https://api.github.com/user/repos', {
+          method: 'POST',
+          headers: {
+            'Authorization': `token ${this.token}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({ name: repo, private: true, auto_init: true })
+        });
+        this.showToast('Storage Initialized', 'Created private .combase-storage repo', 'info');
+        return;
+      }
+
+      // 2. Fetch db.json
+      const res = await fetch(`https://api.github.com/repos/${owner}/${repo}/contents/${path}?ref=${this.activeBranch}`, {
+        headers: { 'Authorization': `token ${this.token}` }
+      });
+
+      if (res.ok) {
+        const fileData = await res.json();
+        this.vaultFileSha = fileData.sha;
+        const decodedStr = decodeURIComponent(escape(atob(fileData.content.replace(/\n/g, ''))));
+        const remoteData = JSON.parse(decodedStr);
+
+        this.databases = remoteData;
+        localStorage.setItem('combase_db_store', JSON.stringify(this.databases));
+        this.updateDbState();
+        this.showToast('Vault Loaded', 'Database loaded from GitHub .combase-storage!', 'success');
+      }
+
+      // 3. Fetch Commit History
+      const commitsRes = await fetch(`https://api.github.com/repos/${owner}/${repo}/commits?sha=${this.activeBranch}`, {
+        headers: { 'Authorization': `token ${this.token}` }
+      });
+      if (commitsRes.ok) {
+        const commitsList = await commitsRes.json();
+        this.commitHistory = commitsList.slice(0, 15).map(c => ({
+          sha: c.sha.substring(0, 7),
+          message: c.commit.message,
+          timestamp: c.commit.author.date,
+          snapshot: JSON.parse(JSON.stringify(this.databases))
+        }));
+        this.renderTimeTravel();
+      }
+
+    } catch (err) {
+      console.warn('Vault load error:', err);
+    }
   }
 
   initElements() {
@@ -231,7 +367,7 @@ class CombaseStudioApp {
         this.activeDb = dbName;
         this.inputNewDbName.value = '';
         this.modalNewDb.classList.add('hidden');
-        this.recordGitCheckpoint(`Created Database '${dbName}'`);
+        this.persistCurrentState(`Created Database '${dbName}'`);
         this.updateDbState();
         this.showToast('Success', `Database '${dbName}' created`, 'success');
       }
@@ -250,7 +386,7 @@ class CombaseStudioApp {
         this.activeBranch = branchName;
         this.inputNewBranchName.value = '';
         this.modalNewBranch.classList.add('hidden');
-        this.recordGitCheckpoint(`Created Branch '${branchName}'`);
+        this.persistCurrentState(`Created Branch '${branchName}'`);
         this.showToast('Branch Created', `Branch '${branchName}' active`, 'success');
       }
     });
@@ -409,6 +545,7 @@ class CombaseStudioApp {
 
       this.user = await res.json();
       this.setAuthenticatedState();
+      await this.loadFromGitHubVault();
 
     } catch (err) {
       if (err.message === 'Invalid Token') {
@@ -434,6 +571,7 @@ class CombaseStudioApp {
   disconnect() {
     this.token = '';
     this.user = null;
+    this.vaultFileSha = null;
     localStorage.removeItem('combase_gh_token');
     
     document.getElementById('token-group').classList.remove('hidden');
@@ -447,6 +585,8 @@ class CombaseStudioApp {
         <span class="user-status text-muted">Standalone Local</span>
       </div>
     `;
+
+    this.showToast('Disconnected', 'Switched to Guest Standalone Mode.', 'info');
   }
 
   setAuthenticatedState() {
@@ -531,7 +671,7 @@ class CombaseStudioApp {
             updatedAt: new Date().toISOString()
           };
           this.dbState.tables[tableName] = this.dbState.tables[tableName] || [];
-          this.recordGitCheckpoint(`SQL: CREATE TABLE ${tableName}`);
+          this.persistCurrentState(`SQL: CREATE TABLE ${tableName}`);
         }
         this.renderQueryResult([], 0, Date.now() - startTime, 1);
 
@@ -545,7 +685,7 @@ class CombaseStudioApp {
             delete this.dbState.schemas[oldName];
             this.dbState.tables[newName] = this.dbState.tables[oldName] || [];
             delete this.dbState.tables[oldName];
-            this.recordGitCheckpoint(`SQL: RENAME ${oldName} -> ${newName}`);
+            this.persistCurrentState(`SQL: RENAME ${oldName} -> ${newName}`);
           }
         }
         this.renderQueryResult([], 0, Date.now() - startTime, 1);
@@ -564,7 +704,7 @@ class CombaseStudioApp {
             row[col.name] = values[idx] || null;
           });
           this.dbState.tables[tableName].push(row);
-          this.recordGitCheckpoint(`SQL: INSERT INTO ${tableName}`);
+          this.persistCurrentState(`SQL: INSERT INTO ${tableName}`);
           this.renderQueryResult([row], 1, Date.now() - startTime, 1);
         }
 
@@ -590,7 +730,7 @@ class CombaseStudioApp {
           const tableName = match[1];
           delete this.dbState.schemas[tableName];
           delete this.dbState.tables[tableName];
-          this.recordGitCheckpoint(`SQL: DROP TABLE ${tableName}`);
+          this.persistCurrentState(`SQL: DROP TABLE ${tableName}`);
           this.renderQueryResult([], 0, Date.now() - startTime, 1);
         }
 
@@ -744,7 +884,7 @@ class CombaseStudioApp {
     });
 
     this.dbState.tables[tableName].push(newRow);
-    this.recordGitCheckpoint(`Visual: Added new row to '${tableName}'`);
+    this.persistCurrentState(`Visual: Added new row to '${tableName}'`);
     this.updateDbState();
     this.inspectTable(tableName);
     this.showToast('Row Created', `Visual row added to ${tableName}`, 'success');
@@ -760,7 +900,7 @@ class CombaseStudioApp {
       const newVal = input.value;
       if (this.dbState.tables[tableName][rowIdx][colName] !== newVal) {
         this.dbState.tables[tableName][rowIdx][colName] = newVal;
-        this.recordGitCheckpoint(`Visual: Updated cell '${colName}' in '${tableName}' to "${newVal}"`);
+        this.persistCurrentState(`Visual: Updated cell '${colName}' in '${tableName}' to "${newVal}"`);
         this.updateDbState();
         tdElement.innerHTML = newVal !== '' ? newVal : '<span class="text-muted">NULL</span>';
         this.showToast('Updated', `Cell updated to "${newVal}"`, 'success');
@@ -828,7 +968,7 @@ class CombaseStudioApp {
     }
 
     this.dbState.schemas[tableName].columns = newCols;
-    this.recordGitCheckpoint(`Visual: Updated schema & columns for '${tableName}'`);
+    this.persistCurrentState(`Visual: Updated schema & columns for '${tableName}'`);
     this.modalManageColumns.classList.add('hidden');
     this.modalManageColumns.classList.remove('z-top');
     this.updateDbState();
@@ -839,7 +979,7 @@ class CombaseStudioApp {
   deleteRow(tableName, rowIndex) {
     if (this.dbState.tables[tableName]) {
       this.dbState.tables[tableName].splice(rowIndex, 1);
-      this.recordGitCheckpoint(`Visual: Deleted row at index ${rowIndex} from '${tableName}'`);
+      this.persistCurrentState(`Visual: Deleted row at index ${rowIndex} from '${tableName}'`);
       this.updateDbState();
       this.inspectTable(tableName);
       this.showToast('Row Deleted', `Deleted row at index ${rowIndex} from ${tableName}`, 'success');
@@ -890,7 +1030,7 @@ class CombaseStudioApp {
       }
 
       this.importProviderTextarea.value = '';
-      this.recordGitCheckpoint('Imported data from external provider');
+      this.persistCurrentState('Imported data from external provider');
       this.updateDbState();
       this.showToast('Import Complete', 'External provider data imported into COMBASE!', 'success');
 
@@ -902,6 +1042,11 @@ class CombaseStudioApp {
   renderTimeTravel() {
     if (!this.timetravelContainer) return;
     this.timetravelContainer.innerHTML = '';
+
+    if (this.commitHistory.length === 0) {
+      this.timetravelContainer.innerHTML = `<div class="p-4 text-center text-muted">No state checkpoints recorded yet.</div>`;
+      return;
+    }
 
     this.commitHistory.forEach((c, idx) => {
       const card = document.createElement('div');
@@ -925,6 +1070,7 @@ class CombaseStudioApp {
     if (!commit || !commit.snapshot) return;
 
     this.databases = JSON.parse(JSON.stringify(commit.snapshot));
+    this.persistCurrentState(`Restored state to checkpoint ${sha}`);
     this.updateDbState();
     this.showToast('State Restored', `Restored database to checkpoint ${sha}`, 'success');
   }
