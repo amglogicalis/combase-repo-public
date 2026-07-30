@@ -10,86 +10,133 @@
 
 <p align="center">
   <a href="#-visión-y-filosofía">Visión</a> •
-  <a href="#-almacenamiento-en-combase-storage">Almacenamiento</a> •
-  <a href="#-zero-copy-branching--time-travel">Branching & Time-Travel</a> •
-  <a href="#-instalación-y-cli">CLI & Uso</a> •
-  <a href="#-sql-studio--consola-web">SQL Studio</a> •
+  <a href="#-demostración-visual--sql-studio">SQL Studio</a> •
+  <a href="#-instalación-y-uso">Instalación</a> •
+  <a href="#-referencia-completa-de-la-cli">CLI Reference</a> •
+  <a href="#-uso-del-sdk">SDK</a> •
   <a href="#-puente-multicloud-provider-bridge">Multicloud Bridge</a> •
-  <a href="LICENSE">Licencia MIT</a>
+  <a href="#-licencia">Licencia MIT</a>
 </p>
 
 ---
 
 ## 🌐 Visión y Filosofía
 
-**COMBASE** es el titán de persistencia de datos del **Ecosistema Terra**. Proporciona un motor de base de datos relacional (ANSI SQL) y documental transaccional de coste $0, eliminando por completo la necesidad de mantener instancias persistentes en RDS, Aurora, DynamoDB o Supabase.
+**COMBASE** es el motor de base de datos relacional (ANSI SQL) y documental transaccional del **Ecosistema Terra**, diseñado para operar a **$0 facturas recurrentes** sin necesidad de mantener servidores ni instancias persistentes en RDS, Aurora, DynamoDB o Supabase.
 
-Su premisa inquebrantable es: **Persistencia transaccional libre de mantenimiento y $0 facturas recurrentes**.
-
----
-
-## 💾 Almacenamiento en `.combase-storage` & Compatibilidad
-
-> [!IMPORTANT]
-> **Almacenamiento por Defecto**: Todas las bases de datos, esquemas y tablas se persisten en el repositorio protegido **`.combase-storage`** de tu cuenta de GitHub. Cada modificación o transacción atómica genera un **checkpoint inmutable (commit)** en Git.
-
-### 🔌 Compatibilidad Extendida:
-- **Rolla-Balls**: Sincronización nativa con el motor de almacenamiento de objetos **Rolla** (`rollaBucket`).
-- **S3 / Parquet Checkpoints**: Exportación e ingesta automática a cualquier bucket compatible con AWS S3.
+Toda la base de datos se guarda de forma encriptada en tu repositorio privado **`.combase-storage`** de GitHub. Cada modificación o transacción atómica genera un **checkpoint inmutable (commit)** en Git con soporte para Time-Travel y Zero-Copy Branching.
 
 ---
 
-## 🌿 Zero-Copy Branching & ⏳ Time-Travel Querying
+## 🖼️ Demostración Visual — COMBASE SQL Studio
 
-1. **Zero-Copy Database Branching**: Crea ramas independientes de tu base de datos en 1 milisegundo (`combase branch create staging`) para probar consultas o cambios de esquema de forma segura sin afectar a producción.
-2. **Time-Travel Querying**: Consulta el estado exacto de tu base de datos en cualquier momento del pasado (`SELECT * FROM users AT COMMIT 'v1.0.4'`) o realiza **Rollback en 1 Clic** a cualquier checkpoint anterior.
+Accede a la consola web oficial en directo:  
+👉 **[https://amglogicalis.github.io/combase-repo-public/](https://amglogicalis.github.io/combase-repo-public/)**
+
+![COMBASE Studio Preview](assets/combase_console_preview.PNG)
+
+### ✨ Características de SQL Studio:
+- **🔒 Autenticación Estricta E2E**: Acceso seguro mediante tu GitHub Personal Access Token (PAT).
+- **💻 Editor SQL Interactivo**: Ejecución en tiempo real de consultas `SELECT`, `INSERT`, `UPDATE`, `DELETE`, `CREATE TABLE`, `ALTER TABLE` y `DROP TABLE`.
+- **🔍 Table Explorer & Edición Visual**: Edición de celdas por doble clic, adición de filas en vivo y gestor visual de esquema de columnas.
+- **🗄️ Gestión Multibase de Datos & Ramas**: Creación, renombrado y borrado limpio de bases de datos y ramas en caliente.
+- **⏳ Time-Travel & Rollback**: Historial visual de commits con restauración de estado en 1 clic.
+- **🌉 Puente Multicloud**: Importación e ingesta bidireccional desde PostgreSQL/Supabase y AWS DynamoDB.
 
 ---
 
-## 🛠️ Instalación y Uso de CLI
+## 📦 Instalación y Uso
 
-### Instalación del SDK
+Instala el paquete globalmente para acceder a la CLI y la Consola Web local desde cualquier directorio:
+
 ```bash
-npm install terra-combase
+npm install -g terra-combase
 ```
 
-### Ejecución de CLI con `npx`
+O ejecútalo directamente usando `npx`:
+
 ```bash
-npx combase <comando>
+npx terra-combase studio
+# o también:
+npx combase studio
 ```
 
-### 🚀 Comandos Principales
+---
+
+## 🛠️ Referencia Completa de la CLI
 
 | Comando | Descripción |
 | :--- | :--- |
 | `npx combase init` | Inicializa el archivo de configuración `combase.config.json`. |
-| `npx combase studio` | Lanza el entorno web local **COMBASE SQL Studio** en `http://localhost:3722`. |
-| `npx combase query "SQL"` | Ejecuta consultas SQL directamente desde la terminal. |
+| `npx combase studio` | Abre la consola web local en `http://localhost:3722`. |
+| `npx combase db ls` | Lista las bases de datos registradas. |
+| `npx combase db use <nombre>` | Cambia la base de datos activa y guarda la preferencia. |
+| `npx combase db create <nombre>` | Crea una nueva base de datos. |
+| `npx combase db rename <old> <new>` | Renombra una base de datos. |
+| `npx combase db delete <nombre>` | Elimina una base de datos. |
+| `npx combase sql "<SQL>"` | Ejecuta cualquier consulta o mutación SQL directamente en consola. |
+| `npx combase table ls` | Lista todas las tablas en la base de datos activa. |
+| `npx combase table inspect <tabla>` | Muestra las filas y estructura de una tabla. |
+| `npx combase table create <t> "<cols>"` | Crea una nueva tabla. |
+| `npx combase table add-col <t> <c> <tipo>` | Añade una nueva columna a una tabla. |
+| `npx combase table drop-col <t> <col>` | Elimina una columna de una tabla. |
+| `npx combase table rename <old> <new>` | Renombra una tabla. |
+| `npx combase table drop <tabla>` | Elimina una tabla. |
+| `npx combase data insert <t> col1=v1 col2=v2` | Inserta un nuevo registro. |
+| `npx combase data update <t> "c=v" WHERE ...` | Actualiza registros existentes. |
+| `npx combase data delete <t> WHERE ...` | Borra registros mediante filtro. |
 | `npx combase branch ls` | Lista las ramas de base de datos activas. |
-| `npx combase branch create <nombre>` | Crea una nueva rama de base de datos. |
-| `npx combase history` | Muestra el historial de checkpoints (commits) de Time-Travel. |
+| `npx combase branch create <nombre>` | Crea una nueva rama (Zero-Copy Branching). |
+| `npx combase branch switch <nombre>` | Cambia a la rama especificada. |
+| `npx combase branch delete <nombre>` | Elimina una rama de base de datos. |
+| `npx combase provider export <postgres\|dynamodb\|rolla>` | Genera DDLs de PostgreSQL, DynamoDB JSON o instantáneas Rolla/S3. |
+| `npx combase provider import <archivo>` | Importa esquemas o datos externos. |
+| `npx combase time-travel history` | Muestra el historial de checkpoints (commits) de Time-Travel. |
+| `npx combase time-travel rollback <sha>` | Restaura la base de datos al estado del commit especificado. |
 | `npx combase export [archivo.sql]` | Exporta la base de datos completa como volcado SQL. |
 | `npx combase import <archivo.sql>` | Importa un volcado SQL a la base de datos. |
 
 ---
 
-## 🎛️ SQL Studio & Consola Web
-Accede al entorno de desarrollo visual **COMBASE SQL Studio** desplegado 24/7 en:  
-👉 **[https://amglogicalis.github.io/combase-repo-public/](https://amglogicalis.github.io/combase-repo-public/)**
+## ⚡ Uso del SDK en Node.js / TypeScript
 
-### Características de SQL Studio:
-- Editor SQL con resaltado de sintaxis, snippets rápidos y ejecución en tiempo real.
-- Inspector de Tablas, Estructura de Columnas e Indicadores de Rendimiento.
-- Timeline de Time-Travel con visualización de Checkpoints y Rollback en 1 clic.
-- Gestor de Ramas de Base de Datos (**Zero-Copy Branching**).
-- Exportador/Importador visual de volcados SQL.
+```typescript
+import { Combase } from 'terra-combase';
+
+const combase = new Combase({
+  githubToken: process.env.GITHUB_TOKEN,
+  storageRepo: '.combase-storage',
+  branch: 'main'
+});
+
+await combase.init();
+
+// Crear tabla
+await combase.query("CREATE TABLE users (id INTEGER PRIMARY KEY, name TEXT, email TEXT)");
+
+// Insertar datos
+await combase.query("INSERT INTO users (id, name, email) VALUES (1, 'Adrián', 'adrian@terra.org')");
+
+// Consultar datos
+const result = await combase.query("SELECT * FROM users WHERE id = 1");
+console.log(result.rows);
+
+// Generar script de migración para PostgreSQL / Supabase
+const pgScript = await combase.generateProviderScript('postgres');
+console.log(pgScript);
+```
 
 ---
 
 ## 🌉 Puente Multicloud (Provider Bridge)
 
-COMBASE funciona de manera 100% autónoma a $0 coste sobre el motor de GitHub, pero permite replicar datos con 1 clic hacia otros proveedores tradicionales:
-- **PostgreSQL / Supabase**
-- **AWS DynamoDB**
-- **MySQL / MariaDB**
-- **SQLite**
+COMBASE permite sincronizar o exportar tus datos a cualquier otro motor tradicional con 1 solo comando:
+- **PostgreSQL / Supabase**: Generación de DDLs de tablas e instrucciones `INSERT`.
+- **AWS DynamoDB**: Generación de colecciones JSON y `PutRequest` para ingesta por lotes.
+- **Rolla-Balls & S3**: Instantáneas comprimidas e inmutables almacenadas en **Rolla** (`.rolla-storage`) o AWS S3.
+
+---
+
+## 📄 Licencia
+
+Este proyecto está bajo la Licencia **MIT** — Libre para uso personal y comercial.
